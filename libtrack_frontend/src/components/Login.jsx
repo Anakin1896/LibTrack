@@ -1,5 +1,6 @@
 import React from 'react';
 import { BookOpen, Users, TrendingUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Login = () => {
   return (
@@ -75,9 +76,9 @@ const Login = () => {
             </button>
           </form>
 
-          <p className="text-center text-sm text-slate-600">
-            Don't have an account? <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">Create account</a>
-          </p>
+            <p className="text-center text-sm text-slate-600">
+                 Don't have an account? <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">Create account</Link>
+            </p>
         </div>
       </div>
     </div>

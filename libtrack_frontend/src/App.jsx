@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
+import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 
 const ProtectedRoute = ({ children }) => {
@@ -19,7 +20,7 @@ function App() {
       <Routes>
 
         <Route path="/login" element={<Login />} />
-
+        <Route path="/register" element={<Register />} />
         <Route 
           path="/dashboard" 
           element={
@@ -30,6 +31,7 @@ function App() {
         />
 
         <Route path="*" element={<Navigate to="/login" replace />} />
+        
       </Routes>
     </BrowserRouter>
   );
