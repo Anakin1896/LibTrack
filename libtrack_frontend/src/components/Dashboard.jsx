@@ -5,7 +5,7 @@ const Dashboard = () => {
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans">
 
-      <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col justify-between hidden md:flex">
+      <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col justify-between md:flex">
         <div className="p-6">
           <div className="flex items-center gap-3 mb-10">
             <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold">J</div>
@@ -155,7 +155,7 @@ const BookRow = ({ title, author, category, status }) => {
 
 const ActivityItem = ({ action, time, type }) => (
   <div className="flex gap-4">
-    <div className={`mt-1 flex-shrink-0 w-2 h-2 rounded-full ${type === 'return' ? 'bg-emerald-500' : 'bg-indigo-500'}`}></div>
+    <div className={`mt-1 shrink-0 w-2 h-2 rounded-full ${type === 'return' ? 'bg-emerald-500' : 'bg-indigo-500'}`}></div>
     <div>
       <p className="text-sm text-slate-700 leading-snug">{action}</p>
       <p className="text-xs text-slate-400 mt-1">{time}</p>
