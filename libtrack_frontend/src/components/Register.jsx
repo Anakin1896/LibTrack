@@ -28,7 +28,7 @@ const Register = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
-      <div className="bg-white rounded-2xl shadow-xl flex flex-col md:flex-row w-full max-w-4xl min-h-[550px] overflow-hidden border border-slate-100">
+      <div className="bg-white rounded-2xl shadow-xl flex flex-col md:flex-row w-full max-w-4xl min-h-137.5 overflow-hidden border border-slate-100">
         <div className="bg-slate-900 md:w-2/5 p-10 flex flex-col justify-between">
           <div>
             <div className="mb-12">
