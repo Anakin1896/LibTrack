@@ -5,9 +5,10 @@ from catalog.models import BookCopy
 
 class BorrowTransaction(models.Model):
     TRANSACTION_STATUS = (
-        ('pending', 'Pending Approval'),
+        ('reserved', 'Reserved by Student/Teacher'),
         ('active', 'Borrowed (Active)'),
         ('returned', 'Returned'),
+        ('overdue', 'Overdue'),
         ('cancelled', 'Cancelled'),
     )
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')

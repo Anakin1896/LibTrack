@@ -27,6 +27,7 @@ class Book(models.Model):
 class BookCopy(models.Model):
     STATUS_CHOICES = (
         ('available', 'Available'),
+        ('reserved', 'Reserved (Pending Pickup)'),
         ('borrowed', 'Currently Borrowed'),
         ('missing', 'Missing'),
         ('destroyed', 'Destroyed'),
