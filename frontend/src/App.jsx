@@ -1,14 +1,16 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+
 function App() {
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center">
-      <h1 className="text-5xl font-extrabold text-blue-600 mb-4">
-        LibTrack is Live! 🚀
-      </h1>
-      <p className="text-slate-500 text-lg">
-        React Frontend + Django Backend
-      </p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/dashboard" element={<div className="p-10 text-2xl font-bold">Dashboard Coming Soon!</div>} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
-export default App
+export default App;
