@@ -9,24 +9,30 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
+ useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const token = localStorage.getItem('access_token');
+      
+      if (!token) {
+        navigate('/login');
+        return;
+      }
 
-    const token = localStorage.getItem('access_token');
-    
-    if (!token) {
-      navigate('/login');
-      return;
-    }
+      try {
 
-    setTimeout(() => {
-      setUser({
-        first_name: 'Joshua',
-        last_name: 'Espeso',
-        role: 'STUDENT'
-      });
-      setLoading(false);
-    }, 500);
+        const response = await api.get('/users/me/'); 
+        setUser(response.data);
+      } catch (error) {
+        console.error("Failed to fetch user:", error);
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        navigate('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
 
+    fetchCurrentUser();
   }, [navigate]);
 
   if (loading) {

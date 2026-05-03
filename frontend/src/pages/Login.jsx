@@ -13,7 +13,7 @@ function Login() {
     setError('');
     
     try {
-      const response = await api.post('users/login/', {
+      const response = await api.post('/users/login/', {
         username: username,
         password: password
       });
@@ -21,10 +21,13 @@ function Login() {
       localStorage.setItem('access_token', response.data.access);
       localStorage.setItem('refresh_token', response.data.refresh);
 
-      navigate('/dashboard'); 
-      
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 100);
+
     } catch (err) {
-      setError('Invalid library credentials. Please try again.');
+      console.error("Login failed:", err);
+      setError(err.response?.data?.detail || "Login failed. Check your username and password.");
     }
   };
 
