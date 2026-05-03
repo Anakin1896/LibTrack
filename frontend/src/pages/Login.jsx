@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../api';
 
 function Login() {
@@ -143,10 +143,12 @@ function Login() {
 
           <div className="mt-10 text-center">
             <p className="text-slate-500 text-sm">
-              Don't have an account? <a href="#" className="font-bold text-[#1a3626] hover:underline">Create one</a>
+              Don't have an account?{' '}
+              <Link to="/register" className="font-bold text-[#1a3626] hover:underline transition-all">
+                Create one
+              </Link>
             </p>
           </div>
-
         </div>
       </div>
 

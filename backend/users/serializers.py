@@ -1,5 +1,6 @@
+import re
 from rest_framework import serializers
-from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.password_validation import validate_password as django_validate_password
 from .models import User, StudentProfile, TeacherProfile
 
 class StudentProfileSerializer(serializers.ModelSerializer):
@@ -21,14 +22,35 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role', 'student_profile', 'teacher_profile')
 
 class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+
+    password = serializers.CharField(write_only=True, required=True)
 
     class Meta:
         model = User
         fields = ('username', 'password', 'email', 'first_name', 'last_name', 'role')
 
-    def create(self, validated_data):
+    def validate_password(self, value):
+        """
+        Custom password validation to enforce specific rules.
+        """
 
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+
+        if not re.search(r'[A-Z]', value):
+            raise serializers.ValidationError("Password must contain at least 1 uppercase letter.")
+
+        if not re.search(r'\d', value):
+            raise serializers.ValidationError("Password must contain at least 1 number.")
+
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
+            raise serializers.ValidationError("Password must contain at least 1 symbol.")
+            
+        django_validate_password(value)
+        
+        return value
+
+    def create(self, validated_data):
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data.get('email', ''),
