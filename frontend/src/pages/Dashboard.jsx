@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminDashboard from '../components/AdminDashboard';
+import MemberDashboard from '../components/MemberDashboard';
 import api from '../api';
 
 function Dashboard() {
@@ -19,9 +20,9 @@ function Dashboard() {
 
     setTimeout(() => {
       setUser({
-        first_name: 'Ana',
-        last_name: 'Reyes',
-        role: 'LIBRARIAN'
+        first_name: 'Joshua',
+        last_name: 'Espeso',
+        role: 'STUDENT'
       });
       setLoading(false);
     }, 500);
@@ -29,19 +30,18 @@ function Dashboard() {
   }, [navigate]);
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center bg-[#FDFCF8]">Loading LibTrack...</div>;
+    return <div className="flex h-screen items-center justify-center bg-[#FDFCF8] font-bold text-[#1a3626]">Loading LibTrack...</div>;
   }
 
   if (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') {
     return <AdminDashboard user={user} />;
   }
 
-  return (
-    <div className="p-10">
-      <h1 className="text-3xl font-bold">Student Catalog</h1>
-      <p>Welcome, {user?.first_name}. The student view is under construction.</p>
-    </div>
-  );
+  if (user?.role === 'STUDENT' || user?.role === 'TEACHER') {
+    return <MemberDashboard user={user} />;
+  }
+
+  return <div>Unknown Role</div>;
 }
 
 export default Dashboard;
