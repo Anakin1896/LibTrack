@@ -8,15 +8,21 @@ function AdminDashboard({ user }) {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   const [notification, setNotification] = useState(null);
+  
   const [books, setBooks] = useState([]);
   const [isLoadingBooks, setIsLoadingBooks] = useState(false);
-
-  const [newBook, setNewBook] = useState({
-    title: '', isbn: '', author: '', category: 'Computer Science', publication_year: new Date().getFullYear(),
-  });
-
+  const [newBook, setNewBook] = useState({ title: '', isbn: '', author: '', category: 'Computer Science', publication_year: new Date().getFullYear() });
   const [copiesToCreate, setCopiesToCreate] = useState('1'); 
   const [editingBook, setEditingBook] = useState(null);
+  const [bookToDelete, setBookToDelete] = useState(null);
+
+  const [transactions, setTransactions] = useState([]);
+  const [isLoadingTx, setIsLoadingTx] = useState(false);
+  const [newTx, setNewTx] = useState({
+    member_id: '',
+    isbn: '',
+    due_date: ''
+  });
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -27,72 +33,103 @@ function AdminDashboard({ user }) {
     setIsLoadingBooks(true);
     try {
       const response = await api.get('/catalog/books/');
-      setBooks(response.data);
+      const data = response.data.results ? response.data.results : response.data;
+      setBooks(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch books:", error);
+      setBooks([]); 
     } finally {
       setIsLoadingBooks(false);
     }
   };
 
+  const fetchTransactions = async () => {
+    setIsLoadingTx(true);
+    try {
+      const response = await api.get('/transactions/'); 
+      const data = response.data.results ? response.data.results : response.data;
+      setTransactions(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to fetch transactions:", error);
+      setTransactions([]); 
+    } finally {
+      setIsLoadingTx(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'inventory') fetchBooks();
+    if (activeTab === 'transactions') fetchTransactions();
   }, [activeTab]);
 
-  
   const handleAddBook = async (e) => {
     e.preventDefault();
     try {
       const bookResponse = await api.post('/catalog/books/', newBook);
       const createdBookId = bookResponse.data.id;
       const copies = parseInt(copiesToCreate, 10) || 1;
-
       for (let i = 0; i < copies; i++) {
         await api.post('/catalog/copies/', { book: createdBookId, status: 'AVAILABLE' });
       }
-
       fetchBooks();
       setNewBook({ title: '', isbn: '', author: '', category: 'Computer Science', publication_year: new Date().getFullYear() });
       setCopiesToCreate('1');
       showNotification("Book and copies successfully added to catalog!", "success");
     } catch (error) {
-      console.error("Failed to add book:", error);
       showNotification("Error saving book. Please check your inputs.", "error");
     }
   };
 
-  
   const handleUpdateBook = async (e) => {
     e.preventDefault();
     try {
-      await api.put(`/catalog/books/${editingBook.id}/`, {
-        title: editingBook.title,
-        isbn: editingBook.isbn,
-        author: editingBook.author,
-        category: editingBook.category,
-        publication_year: editingBook.publication_year || new Date().getFullYear()
-      });
-      
+      await api.put(`/catalog/books/${editingBook.id}/`, editingBook);
       fetchBooks(); 
       setEditingBook(null); 
       showNotification("Book details updated successfully!", "success");
     } catch (error) {
-      console.error("Failed to update book:", error);
       showNotification("Error updating book.", "error");
     }
   };
 
-  
-  const handleDeleteBook = async (id) => {
-    if (window.confirm("Are you sure you want to delete this book? This will also remove all physical copies from the system. This cannot be undone.")) {
-      try {
-        await api.delete(`/catalog/books/${id}/`);
-        fetchBooks();
-        showNotification("Book and all copies deleted.", "success");
-      } catch (error) {
-        console.error("Failed to delete book:", error);
-        showNotification("Error deleting book.", "error");
-      }
+  const confirmDeleteBook = async () => {
+    if (!bookToDelete) return;
+    try {
+      await api.delete(`/catalog/books/${bookToDelete.id}/`);
+      fetchBooks();
+      showNotification(`"${bookToDelete.title}" and all copies deleted.`, "success");
+    } catch (error) {
+      showNotification("Error deleting book.", "error");
+    } finally {
+      setBookToDelete(null);
+    }
+  };
+
+  const handleIssueBook = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/transactions/', newTx);
+      
+      showNotification("Book successfully issued!", "success");
+      setNewTx({ member_id: '', isbn: '', due_date: '' }); 
+      fetchTransactions(); 
+    } catch (error) {
+      console.error("Failed to issue book:", error.response?.data);
+      showNotification(error.response?.data?.detail || "Error issuing book. Check ID/ISBN.", "error");
+    }
+  };
+
+  const handleReturnBook = async (transactionId) => {
+    try {
+      await api.patch(`/transactions/${transactionId}/`, {
+        status: 'RETURNED',
+        return_date: new Date().toISOString() 
+      });
+      showNotification("Book returned successfully!", "success");
+      fetchTransactions();
+    } catch (error) {
+      console.error("Failed to return book:", error);
+      showNotification("Error returning book.", "error");
     }
   };
 
@@ -102,21 +139,33 @@ function AdminDashboard({ user }) {
     navigate('/login');
   };
 
-  const scaffoldTransactions = [
-    { id: 1, user: 'Ian Espeso', book: 'Clean Code', due: 'May 5, 2026', status: 'Active' },
-    { id: 2, user: 'Prince Doe', book: 'Design Patterns', due: 'May 1, 2026', status: 'Overdue' },
-  ];
-
   return (
     <div className="flex h-screen bg-[#FDFCF8] font-sans overflow-hidden relative">
-      
-      
+
       {notification && (
         <div className={`fixed top-6 right-6 z-50 p-4 rounded-xl shadow-xl border flex items-center gap-3 animate-in fade-in slide-in-from-top-5 duration-300 ${
           notification.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
         }`}>
           <span className="text-xl">{notification.type === 'success' ? '✅' : '⚠️'}</span>
           <p className="font-bold text-sm">{notification.message}</p>
+        </div>
+      )}
+
+      {bookToDelete && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100"><span className="text-3xl">🗑️</span></div>
+              <h3 className="font-serif font-bold text-xl text-slate-900 mb-3">Delete Book?</h3>
+              <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+                Are you sure you want to delete <span className="font-bold text-slate-800">"{bookToDelete.title}"</span>? This will permanently remove the book and all its physical copies from the system. This action cannot be undone.
+              </p>
+              <div className="flex justify-center gap-3">
+                <button onClick={() => setBookToDelete(null)} className="px-6 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors w-1/2">Cancel</button>
+                <button onClick={confirmDeleteBook} className="bg-red-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-red-700 transition-all shadow-md w-1/2">Yes, Delete</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -128,29 +177,12 @@ function AdminDashboard({ user }) {
               <button onClick={() => setEditingBook(null)} className="text-emerald-200 hover:text-white text-xl leading-none">&times;</button>
             </div>
             <form onSubmit={handleUpdateBook} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Book Title</label>
-                <input required value={editingBook.title} onChange={(e) => setEditingBook({...editingBook, title: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" />
-              </div>
+              <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Book Title</label><input required value={editingBook.title} onChange={(e) => setEditingBook({...editingBook, title: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" /></div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">ISBN</label>
-                  <input required value={editingBook.isbn} onChange={(e) => setEditingBook({...editingBook, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
-                  <select value={editingBook.category} onChange={(e) => setEditingBook({...editingBook, category: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]">
-                    <option value="Computer Science">Computer Science</option>
-                    <option value="Fiction">Fiction</option>
-                    <option value="Science">Science</option>
-                    <option value="Mathematics">Mathematics</option>
-                  </select>
-                </div>
+                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">ISBN</label><input required value={editingBook.isbn} onChange={(e) => setEditingBook({...editingBook, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" /></div>
+                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label><select value={editingBook.category} onChange={(e) => setEditingBook({...editingBook, category: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]"><option value="Computer Science">Computer Science</option><option value="Fiction">Fiction</option><option value="Science">Science</option><option value="Mathematics">Mathematics</option></select></div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Author</label>
-                <input required value={editingBook.author} onChange={(e) => setEditingBook({...editingBook, author: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" />
-              </div>
+              <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Author</label><input required value={editingBook.author} onChange={(e) => setEditingBook({...editingBook, author: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" /></div>
               <div className="flex justify-end gap-3 mt-6">
                 <button type="button" onClick={() => setEditingBook(null)} className="px-6 py-2.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
                 <button type="submit" className="bg-[#1a3626] text-white px-6 py-2.5 rounded-lg font-bold hover:bg-[#12261a] transition-all shadow-md">Save Changes</button>
@@ -162,9 +194,7 @@ function AdminDashboard({ user }) {
 
       <aside className="hidden lg:flex w-64 bg-[#1a3626] text-white flex-col shadow-2xl z-20">
         <div className="p-8 flex flex-col items-center border-b border-emerald-800/50">
-          <div className="w-20 h-20 bg-yellow-600 rounded-full flex items-center justify-center text-3xl font-serif mb-4 shadow-lg text-[#1a3626]">
-            {user?.first_name?.charAt(0) || 'A'}
-          </div>
+          <div className="w-20 h-20 bg-yellow-600 rounded-full flex items-center justify-center text-3xl font-serif mb-4 shadow-lg text-[#1a3626]">{user?.first_name?.charAt(0) || 'A'}</div>
           <h3 className="font-bold text-lg tracking-wide">{user?.first_name} {user?.last_name}</h3>
           <p className="text-xs text-emerald-300 mb-2">Library Administrator</p>
           <span className="px-3 py-1 bg-yellow-600/20 text-yellow-500 text-[10px] uppercase tracking-widest font-bold rounded-full border border-yellow-600/30">✦ Admin</span>
@@ -176,7 +206,11 @@ function AdminDashboard({ user }) {
           <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'inventory' ? 'bg-yellow-600 text-[#1a3626] font-bold shadow-md' : 'text-emerald-100 hover:bg-emerald-800/50'}`}><span>📚</span> Add / View Books</button>
           <button onClick={() => setActiveTab('transactions')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === 'transactions' ? 'bg-yellow-600 text-[#1a3626] font-bold shadow-md' : 'text-emerald-100 hover:bg-emerald-800/50'}`}>
             <div className="flex items-center gap-3"><span>🔄</span> Transactions</div>
-            <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">5</span>
+            {transactions.filter(t => t.status !== 'RETURNED').length > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {transactions.filter(t => t.status !== 'RETURNED').length}
+              </span>
+            )}
           </button>
         </nav>
         <div className="p-4 mt-auto border-t border-emerald-800/50">
@@ -200,7 +234,7 @@ function AdminDashboard({ user }) {
         </header>
 
         <div className="flex-1 overflow-y-auto p-8">
-
+          
           {activeTab === 'dashboard' && (
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -313,7 +347,7 @@ function AdminDashboard({ user }) {
                             </td>
                             <td className="p-4 text-right pr-6 space-x-4">
                               <button onClick={() => setEditingBook(book)} className="text-[#1a3626] font-bold text-sm hover:underline">Edit</button>
-                              <button onClick={() => handleDeleteBook(book.id)} className="text-red-600 font-bold text-sm hover:underline">Delete</button>
+                              <button onClick={() => setBookToDelete(book)} className="text-red-600 font-bold text-sm hover:underline">Delete</button>
                             </td>
                           </tr>
                         ))
@@ -328,30 +362,32 @@ function AdminDashboard({ user }) {
 
           {activeTab === 'transactions' && (
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+             
              <div className="lg:col-span-1 space-y-6">
                <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
                  <div className="bg-[#1a3626] p-4 border-b border-emerald-800">
                    <h3 className="font-serif font-bold text-lg text-white">Issue Book</h3>
                  </div>
-                 <form className="p-6 space-y-4">
+                 <form onSubmit={handleIssueBook} className="p-6 space-y-4">
                    <div>
                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Student / Teacher ID</label>
-                     <input className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" placeholder="Scan or type ID..." />
+                     <input required value={newTx.member_id} onChange={(e) => setNewTx({...newTx, member_id: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" placeholder="e.g. jdelacruz" />
                    </div>
                    <div>
                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Book ISBN</label>
-                     <input className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" placeholder="Scan or type ISBN..." />
+                     <input required value={newTx.isbn} onChange={(e) => setNewTx({...newTx, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" placeholder="978-X-XX-XXXXXX-X" />
                    </div>
                    <div>
                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Due Date</label>
-                     <input type="date" className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" />
+                     <input required type="date" value={newTx.due_date} onChange={(e) => setNewTx({...newTx, due_date: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" />
                    </div>
-                   <button type="button" className="w-full bg-[#1a3626] text-white px-8 py-3 rounded-lg font-bold hover:bg-[#12261a] transition-all shadow-md mt-4">
+                   <button type="submit" className="w-full bg-[#1a3626] text-white px-8 py-3 rounded-lg font-bold hover:bg-[#12261a] transition-all shadow-md mt-4">
                      Confirm Issue
                    </button>
                  </form>
                </div>
              </div>
+
              <div className="lg:col-span-2">
                <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col h-full">
                  <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
@@ -368,18 +404,35 @@ function AdminDashboard({ user }) {
                        </tr>
                      </thead>
                      <tbody className="text-sm divide-y divide-stone-100 bg-white">
-                       {scaffoldTransactions.map((tx) => (
-                         <tr key={tx.id} className="hover:bg-stone-50/50 transition-colors">
-                           <td className="p-4 pl-6 font-bold text-slate-900">{tx.user}</td>
-                           <td className="p-4 text-slate-600">{tx.book}</td>
-                           <td className="p-4">
-                             <span className={`text-xs px-2 py-1 rounded-md font-bold ${tx.status === 'Overdue' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{tx.due}</span>
-                           </td>
-                           <td className="p-4 text-right pr-6">
-                             <button className="bg-stone-100 text-slate-700 hover:bg-stone-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">Return</button>
-                           </td>
-                         </tr>
-                       ))}
+                       
+                       {isLoadingTx ? (
+                          <tr><td colSpan="4" className="p-6 text-center text-slate-500">Loading transactions...</td></tr>
+                        ) : transactions.filter(tx => tx.status !== 'RETURNED').length === 0 ? (
+                          <tr><td colSpan="4" className="p-6 text-center text-slate-500">No active borrowings found.</td></tr>
+                        ) : (
+                          transactions.filter(tx => tx.status !== 'RETURNED').map((tx) => {
+                            const isOverdue = new Date(tx.due_date) < new Date();
+                            return (
+                              <tr key={tx.id} className="hover:bg-stone-50/50 transition-colors">
+                                <td className="p-4 pl-6 font-bold text-slate-900">{tx.user?.username || tx.user || tx.member_id || "User"}</td>
+                                <td className="p-4 text-slate-600">{tx.book_copy?.book?.title || tx.isbn || "Unknown Book"}</td>
+                                <td className="p-4">
+                                  <span className={`text-xs px-2 py-1 rounded-md font-bold ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {new Date(tx.due_date).toLocaleDateString()} {isOverdue && "(Overdue)"}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-right pr-6">
+                                  <button 
+                                    onClick={() => handleReturnBook(tx.id)} 
+                                    className="bg-stone-100 text-[#1a3626] hover:bg-emerald-100 hover:text-emerald-800 px-4 py-2 rounded-lg text-xs font-bold transition-colors border border-stone-200"
+                                  >
+                                    Mark as Returned
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                       )}
                      </tbody>
                    </table>
                  </div>
