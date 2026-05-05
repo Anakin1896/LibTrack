@@ -4,7 +4,7 @@ from .models import Book, BookCopy
 class BookCopySerializer(serializers.ModelSerializer):
     class Meta:
         model = BookCopy
-        fields = ('id', 'tracking_uuid', 'status')
+        fields = ('id', 'book', 'tracking_uuid', 'status')
 
 class BookSerializer(serializers.ModelSerializer):
 
