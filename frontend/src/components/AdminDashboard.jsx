@@ -7,21 +7,26 @@ function AdminDashboard({ user }) {
   const navigate = useNavigate();
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
+  const [notification, setNotification] = useState(null);
   const [books, setBooks] = useState([]);
   const [isLoadingBooks, setIsLoadingBooks] = useState(false);
 
   const [newBook, setNewBook] = useState({
-    title: '',
-    isbn: '',
-    author: '',
-    category: 'Computer Science',
-    publication_year: new Date().getFullYear(),
+    title: '', isbn: '', author: '', category: 'Computer Science', publication_year: new Date().getFullYear(),
   });
-  const [copiesToCreate, setCopiesToCreate] = useState(1);
+
+  const [copiesToCreate, setCopiesToCreate] = useState('1'); 
+  const [editingBook, setEditingBook] = useState(null);
+
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
   const fetchBooks = async () => {
     setIsLoadingBooks(true);
     try {
-      const response = await api.get('/books/');
+      const response = await api.get('/catalog/books/');
       setBooks(response.data);
     } catch (error) {
       console.error("Failed to fetch books:", error);
@@ -31,33 +36,63 @@ function AdminDashboard({ user }) {
   };
 
   useEffect(() => {
-    if (activeTab === 'inventory') {
-      fetchBooks();
-    }
+    if (activeTab === 'inventory') fetchBooks();
   }, [activeTab]);
 
+  
   const handleAddBook = async (e) => {
     e.preventDefault();
     try {
-
-      const bookResponse = await api.post('/books/', newBook);
+      const bookResponse = await api.post('/catalog/books/', newBook);
       const createdBookId = bookResponse.data.id;
+      const copies = parseInt(copiesToCreate, 10) || 1;
 
-      for (let i = 0; i < copiesToCreate; i++) {
-        await api.post('/copies/', {
-          book: createdBookId,
-          status: 'AVAILABLE'
-        });
+      for (let i = 0; i < copies; i++) {
+        await api.post('/catalog/copies/', { book: createdBookId, status: 'AVAILABLE' });
       }
 
       fetchBooks();
       setNewBook({ title: '', isbn: '', author: '', category: 'Computer Science', publication_year: new Date().getFullYear() });
-      setCopiesToCreate(1);
-      alert("Book and copies successfully added to catalog!");
-
+      setCopiesToCreate('1');
+      showNotification("Book and copies successfully added to catalog!", "success");
     } catch (error) {
-      console.error("Failed to add book:", error.response?.data || error);
-      alert("Error saving book. Check the console.");
+      console.error("Failed to add book:", error);
+      showNotification("Error saving book. Please check your inputs.", "error");
+    }
+  };
+
+  
+  const handleUpdateBook = async (e) => {
+    e.preventDefault();
+    try {
+      await api.put(`/catalog/books/${editingBook.id}/`, {
+        title: editingBook.title,
+        isbn: editingBook.isbn,
+        author: editingBook.author,
+        category: editingBook.category,
+        publication_year: editingBook.publication_year || new Date().getFullYear()
+      });
+      
+      fetchBooks(); 
+      setEditingBook(null); 
+      showNotification("Book details updated successfully!", "success");
+    } catch (error) {
+      console.error("Failed to update book:", error);
+      showNotification("Error updating book.", "error");
+    }
+  };
+
+  
+  const handleDeleteBook = async (id) => {
+    if (window.confirm("Are you sure you want to delete this book? This will also remove all physical copies from the system. This cannot be undone.")) {
+      try {
+        await api.delete(`/catalog/books/${id}/`);
+        fetchBooks();
+        showNotification("Book and all copies deleted.", "success");
+      } catch (error) {
+        console.error("Failed to delete book:", error);
+        showNotification("Error deleting book.", "error");
+      }
     }
   };
 
@@ -73,7 +108,58 @@ function AdminDashboard({ user }) {
   ];
 
   return (
-    <div className="flex h-screen bg-[#FDFCF8] font-sans overflow-hidden">
+    <div className="flex h-screen bg-[#FDFCF8] font-sans overflow-hidden relative">
+      
+      
+      {notification && (
+        <div className={`fixed top-6 right-6 z-50 p-4 rounded-xl shadow-xl border flex items-center gap-3 animate-in fade-in slide-in-from-top-5 duration-300 ${
+          notification.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          <span className="text-xl">{notification.type === 'success' ? '✅' : '⚠️'}</span>
+          <p className="font-bold text-sm">{notification.message}</p>
+        </div>
+      )}
+
+      {editingBook && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100">
+            <div className="bg-[#1a3626] p-4 px-6 flex justify-between items-center">
+              <h3 className="font-serif font-bold text-lg text-white">Edit Book Details</h3>
+              <button onClick={() => setEditingBook(null)} className="text-emerald-200 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <form onSubmit={handleUpdateBook} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Book Title</label>
+                <input required value={editingBook.title} onChange={(e) => setEditingBook({...editingBook, title: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">ISBN</label>
+                  <input required value={editingBook.isbn} onChange={(e) => setEditingBook({...editingBook, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                  <select value={editingBook.category} onChange={(e) => setEditingBook({...editingBook, category: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]">
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Fiction">Fiction</option>
+                    <option value="Science">Science</option>
+                    <option value="Mathematics">Mathematics</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Author</label>
+                <input required value={editingBook.author} onChange={(e) => setEditingBook({...editingBook, author: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" />
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button type="button" onClick={() => setEditingBook(null)} className="px-6 py-2.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
+                <button type="submit" className="bg-[#1a3626] text-white px-6 py-2.5 rounded-lg font-bold hover:bg-[#12261a] transition-all shadow-md">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <aside className="hidden lg:flex w-64 bg-[#1a3626] text-white flex-col shadow-2xl z-20">
         <div className="p-8 flex flex-col items-center border-b border-emerald-800/50">
           <div className="w-20 h-20 bg-yellow-600 rounded-full flex items-center justify-center text-3xl font-serif mb-4 shadow-lg text-[#1a3626]">
@@ -81,27 +167,18 @@ function AdminDashboard({ user }) {
           </div>
           <h3 className="font-bold text-lg tracking-wide">{user?.first_name} {user?.last_name}</h3>
           <p className="text-xs text-emerald-300 mb-2">Library Administrator</p>
-          <span className="px-3 py-1 bg-yellow-600/20 text-yellow-500 text-[10px] uppercase tracking-widest font-bold rounded-full border border-yellow-600/30">
-            ✦ Admin
-          </span>
+          <span className="px-3 py-1 bg-yellow-600/20 text-yellow-500 text-[10px] uppercase tracking-widest font-bold rounded-full border border-yellow-600/30">✦ Admin</span>
         </div>
-
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-4">
           <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest ml-4 mb-2">Main</p>
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-yellow-600 text-[#1a3626] font-bold shadow-md' : 'text-emerald-100 hover:bg-emerald-800/50'}`}>
-            <span>⊞</span> Dashboard
-          </button>
-          
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'dashboard' ? 'bg-yellow-600 text-[#1a3626] font-bold shadow-md' : 'text-emerald-100 hover:bg-emerald-800/50'}`}><span>⊞</span> Dashboard</button>
           <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest ml-4 mt-6 mb-2">Library</p>
-          <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'inventory' ? 'bg-yellow-600 text-[#1a3626] font-bold shadow-md' : 'text-emerald-100 hover:bg-emerald-800/50'}`}>
-            <span>📚</span> Add / View Books
-          </button>
+          <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'inventory' ? 'bg-yellow-600 text-[#1a3626] font-bold shadow-md' : 'text-emerald-100 hover:bg-emerald-800/50'}`}><span>📚</span> Add / View Books</button>
           <button onClick={() => setActiveTab('transactions')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === 'transactions' ? 'bg-yellow-600 text-[#1a3626] font-bold shadow-md' : 'text-emerald-100 hover:bg-emerald-800/50'}`}>
             <div className="flex items-center gap-3"><span>🔄</span> Transactions</div>
             <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">5</span>
           </button>
         </nav>
-
         <div className="p-4 mt-auto border-t border-emerald-800/50">
           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-emerald-100/70 hover:text-white hover:bg-red-500/20 hover:text-red-100 rounded-xl transition-all text-left">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
@@ -123,32 +200,23 @@ function AdminDashboard({ user }) {
         </header>
 
         <div className="flex-1 overflow-y-auto p-8">
+
           {activeTab === 'dashboard' && (
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                <div className="bg-white p-6 rounded-2xl border-t-4 border-[#1a3626] shadow-sm flex flex-col justify-between">
                  <span className="text-2xl mb-2">📚</span>
-                 <div>
-                   <h3 className="text-3xl font-bold text-slate-900">2,418</h3>
-                   <p className="text-sm text-slate-500">Total Books</p>
-                 </div>
+                 <div><h3 className="text-3xl font-bold text-slate-900">2,418</h3><p className="text-sm text-slate-500">Total Books</p></div>
                </div>
                <div className="bg-white p-6 rounded-2xl border-t-4 border-yellow-500 shadow-sm flex flex-col justify-between">
                  <span className="text-2xl mb-2">🔄</span>
-                 <div>
-                   <h3 className="text-3xl font-bold text-slate-900">84</h3>
-                   <p className="text-sm text-slate-500">Currently Borrowed</p>
-                 </div>
+                 <div><h3 className="text-3xl font-bold text-slate-900">84</h3><p className="text-sm text-slate-500">Currently Borrowed</p></div>
                </div>
                <div className="bg-white p-6 rounded-2xl border-t-4 border-indigo-500 shadow-sm flex flex-col justify-between">
                  <span className="text-2xl mb-2">👥</span>
-                 <div>
-                   <h3 className="text-3xl font-bold text-slate-900">342</h3>
-                   <p className="text-sm text-slate-500">Active Members</p>
-                 </div>
+                 <div><h3 className="text-3xl font-bold text-slate-900">342</h3><p className="text-sm text-slate-500">Active Members</p></div>
                </div>
              </div>
-
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-stone-100 flex items-center justify-center h-64 text-slate-400">
                  <p>Dashboard Activity Feed UI</p>
@@ -177,41 +245,19 @@ function AdminDashboard({ user }) {
                 <form onSubmit={handleAddBook} className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Book Title</label>
-                    <input 
-                      required 
-                      value={newBook.title} 
-                      onChange={(e) => setNewBook({...newBook, title: e.target.value})} 
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" 
-                      placeholder="e.g. The Great Gatsby" 
-                    />
+                    <input required value={newBook.title} onChange={(e) => setNewBook({...newBook, title: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" placeholder="e.g. The Great Gatsby" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ISBN</label>
-                    <input 
-                      required 
-                      value={newBook.isbn} 
-                      onChange={(e) => setNewBook({...newBook, isbn: e.target.value})} 
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" 
-                      placeholder="978-3-16-148410-0" 
-                    />
+                    <input required value={newBook.isbn} onChange={(e) => setNewBook({...newBook, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" placeholder="978-3-16-148410-0" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Author</label>
-                    <input 
-                      required 
-                      value={newBook.author} 
-                      onChange={(e) => setNewBook({...newBook, author: e.target.value})} 
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" 
-                      placeholder="Author Name" 
-                    />
+                    <input required value={newBook.author} onChange={(e) => setNewBook({...newBook, author: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" placeholder="Author Name" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Category</label>
-                    <select 
-                      value={newBook.category} 
-                      onChange={(e) => setNewBook({...newBook, category: e.target.value})} 
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]"
-                    >
+                    <select value={newBook.category} onChange={(e) => setNewBook({...newBook, category: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]">
                       <option value="Computer Science">Computer Science</option>
                       <option value="Fiction">Fiction</option>
                       <option value="Science">Science</option>
@@ -220,14 +266,7 @@ function AdminDashboard({ user }) {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Copies</label>
-                    <input 
-                      type="number" 
-                      required
-                      value={copiesToCreate} 
-                      onChange={(e) => setCopiesToCreate(Number(e.target.value))} 
-                      className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" 
-                      min="1" 
-                    />
+                    <input type="number" required value={copiesToCreate} onChange={(e) => setCopiesToCreate(e.target.value)} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626]" min="1" />
                   </div>
                   <div className="md:col-span-3 flex justify-end mt-2">
                     <button type="submit" className="bg-[#1a3626] text-white px-8 py-3 rounded-lg font-bold hover:bg-[#12261a] transition-all shadow-md">
@@ -252,7 +291,6 @@ function AdminDashboard({ user }) {
                       </tr>
                     </thead>
                     <tbody className="text-sm divide-y divide-stone-100 bg-white">
-
                       {isLoadingBooks ? (
                         <tr><td colSpan="4" className="p-6 text-center text-slate-500">Loading catalog...</td></tr>
                       ) : books.length === 0 ? (
@@ -273,8 +311,9 @@ function AdminDashboard({ user }) {
                                 </span>
                               </div>
                             </td>
-                            <td className="p-4 text-right pr-6">
-                              <button className="text-[#1a3626] font-bold text-sm hover:underline">Edit</button>
+                            <td className="p-4 text-right pr-6 space-x-4">
+                              <button onClick={() => setEditingBook(book)} className="text-[#1a3626] font-bold text-sm hover:underline">Edit</button>
+                              <button onClick={() => handleDeleteBook(book.id)} className="text-red-600 font-bold text-sm hover:underline">Delete</button>
                             </td>
                           </tr>
                         ))
@@ -313,7 +352,6 @@ function AdminDashboard({ user }) {
                  </form>
                </div>
              </div>
-
              <div className="lg:col-span-2">
                <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col h-full">
                  <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
@@ -335,14 +373,10 @@ function AdminDashboard({ user }) {
                            <td className="p-4 pl-6 font-bold text-slate-900">{tx.user}</td>
                            <td className="p-4 text-slate-600">{tx.book}</td>
                            <td className="p-4">
-                             <span className={`text-xs px-2 py-1 rounded-md font-bold ${tx.status === 'Overdue' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                               {tx.due}
-                             </span>
+                             <span className={`text-xs px-2 py-1 rounded-md font-bold ${tx.status === 'Overdue' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{tx.due}</span>
                            </td>
                            <td className="p-4 text-right pr-6">
-                             <button className="bg-stone-100 text-slate-700 hover:bg-stone-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
-                               Return
-                             </button>
+                             <button className="bg-stone-100 text-slate-700 hover:bg-stone-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">Return</button>
                            </td>
                          </tr>
                        ))}
@@ -351,7 +385,6 @@ function AdminDashboard({ user }) {
                  </div>
                </div>
              </div>
-
            </div>
           )}
 
