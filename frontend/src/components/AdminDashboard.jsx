@@ -21,6 +21,8 @@ function AdminDashboard({ user }) {
 
   const [transactions, setTransactions] = useState([]);
   const [isLoadingTx, setIsLoadingTx] = useState(false);
+  
+  const [txFilter, setTxFilter] = useState('active'); 
   const [newTx, setNewTx] = useState({
     member_id: '',
     isbn: '',
@@ -46,7 +48,6 @@ function AdminDashboard({ user }) {
     }
   };
 
-  // --- NEW: Bulk Creation Logic ---
   const handleAddExtraCopies = async (e) => {
     e.preventDefault();
     const count = parseInt(extraCopiesCount, 10) || 0;
@@ -160,6 +161,26 @@ function AdminDashboard({ user }) {
     localStorage.removeItem('refresh_token');
     navigate('/login');
   };
+
+  const getTxStatus = (tx) => {
+    if (tx.status === 'RETURNED') return { text: 'Returned', style: 'bg-stone-100 text-stone-600 border-stone-200' };
+    
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0); 
+    const dueDate = new Date(tx.due_date);
+    dueDate.setHours(0, 0, 0, 0);
+    
+    const diffDays = Math.ceil((dueDate - todayDate) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return { text: 'Overdue', style: 'bg-red-100 text-red-800 border-red-200' };
+    if (diffDays <= 3) return { text: 'Due Soon', style: 'bg-orange-100 text-orange-800 border-orange-200' };
+    return { text: 'Active', style: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
+  };
+
+  const displayedTransactions = transactions.filter(tx => {
+    if (txFilter === 'active') return tx.status !== 'RETURNED';
+    return true; 
+  });
 
   return (
     <div className="flex h-screen bg-[#FDFCF8] font-sans overflow-hidden relative">
@@ -398,6 +419,7 @@ function AdminDashboard({ user }) {
                             </td>
                             <td className="p-4 text-right pr-6 space-x-4">
                               <button onClick={() => setAddingCopiesToBook(book)} className="text-blue-600 font-bold text-sm hover:underline">+ Copies</button>
+                              
                               <button onClick={() => setEditingBook(book)} className="text-[#1a3626] font-bold text-sm hover:underline">Edit</button>
                               <button onClick={() => setBookToDelete(book)} className="text-red-600 font-bold text-sm hover:underline">Delete</button>
                             </td>
@@ -441,8 +463,23 @@ function AdminDashboard({ user }) {
              <div className="lg:col-span-2">
                <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col h-full">
                  <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
-                   <h3 className="font-serif font-bold text-lg text-slate-900">Active Borrowings</h3>
+                   <h3 className="font-serif font-bold text-lg text-slate-900">Borrowing History</h3>
+                   <div className="flex bg-stone-50 p-1 rounded-lg border border-stone-200">
+                      <button 
+                        onClick={() => setTxFilter('active')} 
+                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${txFilter === 'active' ? 'bg-white text-slate-900 shadow-sm border border-stone-200' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        Active Only
+                      </button>
+                      <button 
+                        onClick={() => setTxFilter('all')} 
+                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${txFilter === 'all' ? 'bg-white text-slate-900 shadow-sm border border-stone-200' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        All History
+                      </button>
+                   </div>
                  </div>
+
                  <div className="overflow-x-auto flex-1">
                    <table className="w-full text-left border-collapse">
                      <thead>
@@ -450,30 +487,42 @@ function AdminDashboard({ user }) {
                          <th className="p-4 pl-6 font-semibold">Borrower</th>
                          <th className="p-4 font-semibold">Book Title</th>
                          <th className="p-4 font-semibold">Due Date</th>
+                         <th className="p-4 font-semibold">Status</th>
                          <th className="p-4 font-semibold text-right pr-6">Action</th>
                        </tr>
                      </thead>
                      <tbody className="text-sm divide-y divide-stone-100 bg-white">
                        {isLoadingTx ? (
-                          <tr><td colSpan="4" className="p-6 text-center text-slate-500">Loading transactions...</td></tr>
-                        ) : transactions.filter(tx => tx.status !== 'RETURNED').length === 0 ? (
-                          <tr><td colSpan="4" className="p-6 text-center text-slate-500">No active borrowings found.</td></tr>
+                          <tr><td colSpan="5" className="p-6 text-center text-slate-500">Loading transactions...</td></tr>
+                        ) : displayedTransactions.length === 0 ? (
+                          <tr><td colSpan="5" className="p-6 text-center text-slate-500">No borrowings found.</td></tr>
                         ) : (
-                          transactions.filter(tx => tx.status !== 'RETURNED').map((tx) => {
-                            const isOverdue = new Date(tx.due_date) < new Date();
+                          displayedTransactions.map((tx) => {
+                            
+                            const status = getTxStatus(tx);
+                            
                             return (
-                              <tr key={tx.id} className="hover:bg-stone-50/50 transition-colors">
+                              <tr key={tx.id} className={`hover:bg-stone-50/50 transition-colors ${tx.status === 'RETURNED' ? 'opacity-60' : ''}`}>
                                 <td className="p-4 pl-6 font-bold text-slate-900">{tx.user?.username || tx.user || tx.member_id || "User"}</td>
                                 <td className="p-4 text-slate-600">{tx.book_title || "Unknown Book"}</td>
+                                <td className="p-4 font-medium text-slate-700">
+                                  {new Date(tx.due_date).toLocaleDateString()}
+                                </td>
+                                
                                 <td className="p-4">
-                                  <span className={`text-xs px-2 py-1 rounded-md font-bold ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                    {new Date(tx.due_date).toLocaleDateString()} {isOverdue && "(Overdue)"}
+                                  <span className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold border ${status.style}`}>
+                                    {status.text}
                                   </span>
                                 </td>
+
                                 <td className="p-4 text-right pr-6">
-                                  <button onClick={() => handleReturnBook(tx.id)} className="bg-stone-100 text-[#1a3626] hover:bg-emerald-100 hover:text-emerald-800 px-4 py-2 rounded-lg text-xs font-bold transition-colors border border-stone-200">
-                                    Mark as Returned
-                                  </button>
+                                  {tx.status !== 'RETURNED' ? (
+                                    <button onClick={() => handleReturnBook(tx.id)} className="bg-stone-100 text-[#1a3626] hover:bg-emerald-100 hover:text-emerald-800 px-4 py-2 rounded-lg text-xs font-bold transition-colors border border-stone-200">
+                                      Mark as Returned
+                                    </button>
+                                  ) : (
+                                    <span className="text-xs font-bold text-stone-400 px-4 py-2">Completed</span>
+                                  )}
                                 </td>
                               </tr>
                             );
