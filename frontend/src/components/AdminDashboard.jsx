@@ -21,13 +21,14 @@ function AdminDashboard({ user }) {
 
   const [transactions, setTransactions] = useState([]);
   const [isLoadingTx, setIsLoadingTx] = useState(false);
-  
   const [txFilter, setTxFilter] = useState('active'); 
   const [newTx, setNewTx] = useState({
     member_id: '',
     isbn: '',
     due_date: ''
   });
+
+  const [transactionToMarkLost, setTransactionToMarkLost] = useState(null);
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -156,6 +157,22 @@ function AdminDashboard({ user }) {
     }
   };
 
+  const confirmMarkLost = async () => {
+    if (!transactionToMarkLost) return;
+    try {
+      await api.patch(`/transactions/${transactionToMarkLost.id}/`, {
+        status: 'LOST'
+      });
+      showNotification("Book marked as lost.", "error"); 
+      fetchTransactions();
+    } catch (error) {
+      console.error("Failed to mark book as lost:", error);
+      showNotification("Error. Ensure 'LOST' is a valid status choice in Django.", "error");
+    } finally {
+      setTransactionToMarkLost(null);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
@@ -163,7 +180,14 @@ function AdminDashboard({ user }) {
   };
 
   const getTxStatus = (tx) => {
-    if (tx.status === 'RETURNED') return { text: 'Returned', style: 'bg-stone-100 text-stone-600 border-stone-200' };
+    if (tx.status === 'LOST') return { text: 'Lost', style: 'bg-slate-800 text-white border-slate-900' };
+    
+    if (tx.status === 'RETURNED') {
+      if (tx.return_date && new Date(tx.return_date) > new Date(tx.due_date)) {
+         return { text: 'Returned Late', style: 'bg-yellow-100 text-yellow-800 border-yellow-300' };
+      }
+      return { text: 'Returned', style: 'bg-stone-100 text-stone-600 border-stone-200' };
+    }
     
     const todayDate = new Date();
     todayDate.setHours(0, 0, 0, 0); 
@@ -178,7 +202,7 @@ function AdminDashboard({ user }) {
   };
 
   const displayedTransactions = transactions.filter(tx => {
-    if (txFilter === 'active') return tx.status !== 'RETURNED';
+    if (txFilter === 'active') return tx.status === 'ACTIVE';
     return true; 
   });
 
@@ -191,6 +215,24 @@ function AdminDashboard({ user }) {
         }`}>
           <span className="text-xl">{notification.type === 'success' ? '✅' : '⚠️'}</span>
           <p className="font-bold text-sm">{notification.message}</p>
+        </div>
+      )}
+
+      {transactionToMarkLost && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100"><span className="text-3xl">⚠️</span></div>
+              <h3 className="font-serif font-bold text-xl text-slate-900 mb-3">Mark Book as Lost?</h3>
+              <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+                Are you sure you want to mark <span className="font-bold text-slate-800">"{transactionToMarkLost.book_title || 'this book'}"</span> borrowed by <span className="font-bold text-slate-800">{transactionToMarkLost.user?.username || transactionToMarkLost.user || 'this user'}</span> as lost? This will permanently remove the physical copy from available circulation.
+              </p>
+              <div className="flex justify-center gap-3">
+                <button onClick={() => setTransactionToMarkLost(null)} className="px-6 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors w-1/2">Cancel</button>
+                <button onClick={confirmMarkLost} className="bg-red-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-red-700 transition-all shadow-md w-1/2">Yes, Mark Lost</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -278,9 +320,9 @@ function AdminDashboard({ user }) {
           <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'inventory' ? 'bg-yellow-600 text-[#1a3626] font-bold shadow-md' : 'text-emerald-100 hover:bg-emerald-800/50'}`}><span>📚</span> Add / View Books</button>
           <button onClick={() => setActiveTab('transactions')} className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === 'transactions' ? 'bg-yellow-600 text-[#1a3626] font-bold shadow-md' : 'text-emerald-100 hover:bg-emerald-800/50'}`}>
             <div className="flex items-center gap-3"><span>🔄</span> Transactions</div>
-            {transactions.filter(t => t.status !== 'RETURNED').length > 0 && (
+            {transactions.filter(t => t.status === 'ACTIVE').length > 0 && (
               <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                {transactions.filter(t => t.status !== 'RETURNED').length}
+                {transactions.filter(t => t.status === 'ACTIVE').length}
               </span>
             )}
           </button>
@@ -462,6 +504,7 @@ function AdminDashboard({ user }) {
 
              <div className="lg:col-span-2">
                <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col h-full">
+                 
                  <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
                    <h3 className="font-serif font-bold text-lg text-slate-900">Borrowing History</h3>
                    <div className="flex bg-stone-50 p-1 rounded-lg border border-stone-200">
@@ -498,11 +541,10 @@ function AdminDashboard({ user }) {
                           <tr><td colSpan="5" className="p-6 text-center text-slate-500">No borrowings found.</td></tr>
                         ) : (
                           displayedTransactions.map((tx) => {
-                            
                             const status = getTxStatus(tx);
                             
                             return (
-                              <tr key={tx.id} className={`hover:bg-stone-50/50 transition-colors ${tx.status === 'RETURNED' ? 'opacity-60' : ''}`}>
+                              <tr key={tx.id} className={`hover:bg-stone-50/50 transition-colors ${tx.status === 'RETURNED' || tx.status === 'LOST' ? 'opacity-60' : ''}`}>
                                 <td className="p-4 pl-6 font-bold text-slate-900">{tx.user?.username || tx.user || tx.member_id || "User"}</td>
                                 <td className="p-4 text-slate-600">{tx.book_title || "Unknown Book"}</td>
                                 <td className="p-4 font-medium text-slate-700">
@@ -516,10 +558,15 @@ function AdminDashboard({ user }) {
                                 </td>
 
                                 <td className="p-4 text-right pr-6">
-                                  {tx.status !== 'RETURNED' ? (
-                                    <button onClick={() => handleReturnBook(tx.id)} className="bg-stone-100 text-[#1a3626] hover:bg-emerald-100 hover:text-emerald-800 px-4 py-2 rounded-lg text-xs font-bold transition-colors border border-stone-200">
-                                      Mark as Returned
-                                    </button>
+                                  {tx.status === 'ACTIVE' ? (
+                                    <div className="flex items-center justify-end gap-3">
+                                      <button onClick={() => setTransactionToMarkLost(tx)} className="text-red-500 hover:text-red-700 text-xs font-bold transition-colors">
+                                        Lost?
+                                      </button>
+                                      <button onClick={() => handleReturnBook(tx.id)} className="bg-stone-100 text-[#1a3626] hover:bg-emerald-100 hover:text-emerald-800 px-4 py-2 rounded-lg text-xs font-bold transition-colors border border-stone-200">
+                                        Mark as Returned
+                                      </button>
+                                    </div>
                                   ) : (
                                     <span className="text-xs font-bold text-stone-400 px-4 py-2">Completed</span>
                                   )}

@@ -17,6 +17,9 @@ class BookCopy(models.Model):
         ('RESERVED', 'Reserved'),
         ('BORROWED', 'Borrowed'),
         ('MISSING', 'Missing'),
+        ('RETURNED', 'Returned'),
+        ('ACTIVE', 'Active'),
+        ('LOST', 'Lost'),
     )
 
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='copies')

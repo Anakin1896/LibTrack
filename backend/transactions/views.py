@@ -55,7 +55,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = serializer.save()
+        copy = instance.book_copy
+        
         if instance.status == 'RETURNED':
-            copy = instance.book_copy
             copy.status = 'AVAILABLE'
+            copy.save()
+        elif instance.status == 'LOST':
+            copy.status = 'LOST'
             copy.save()

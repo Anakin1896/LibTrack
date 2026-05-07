@@ -8,7 +8,7 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Transaction
-        fields = ('id', 'user', 'book_copy', 'book_title', 'reservation_date', 'due_date', 'status')
+        fields = ('id', 'user', 'book_copy', 'book_title', 'reservation_date', 'due_date', 'status', 'return_date')
 
     def validate(self, data):
         book_copy = data.get('book_copy')
