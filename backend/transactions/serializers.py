@@ -4,7 +4,6 @@ from catalog.models import BookCopy
 
 class TransactionSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
-    status = serializers.ReadOnlyField()
     book_title = serializers.ReadOnlyField(source='book_copy.book.title')
 
     class Meta:
@@ -18,10 +17,8 @@ class TransactionSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-
         transaction = Transaction.objects.create(**validated_data)
         book_copy = validated_data['book_copy']
         book_copy.status = 'RESERVED'
         book_copy.save()
-        
         return transaction
