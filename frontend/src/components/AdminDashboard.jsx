@@ -137,6 +137,8 @@ function AdminDashboard({ user }) {
       showNotification("Book successfully issued!", "success");
       setNewTx({ member_id: '', isbn: '', due_date: '' }); 
       fetchTransactions(); 
+
+      if (activeTab === 'transactions') fetchBooks(); 
     } catch (error) {
       console.error("Failed to issue book:", error.response?.data);
       showNotification(error.response?.data?.detail || "Error issuing book. Check ID/ISBN.", "error");
@@ -151,6 +153,7 @@ function AdminDashboard({ user }) {
       });
       showNotification("Book returned successfully!", "success");
       fetchTransactions();
+      fetchBooks(); 
     } catch (error) {
       console.error("Failed to return book:", error);
       showNotification("Error returning book.", "error");
@@ -165,9 +168,10 @@ function AdminDashboard({ user }) {
       });
       showNotification("Book marked as lost.", "error"); 
       fetchTransactions();
+      fetchBooks(); 
     } catch (error) {
       console.error("Failed to mark book as lost:", error);
-      showNotification("Error. Ensure 'LOST' is a valid status choice in Django.", "error");
+      showNotification("Error updating status.", "error");
     } finally {
       setTransactionToMarkLost(null);
     }
@@ -453,7 +457,7 @@ function AdminDashboard({ user }) {
                             <td className="p-4 text-slate-600">{book.author}</td>
                             <td className="p-4">
                               <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-700">{book.copies?.length || 0}</span>
+                                <span className="font-bold text-slate-700">{book.active_copies_count ?? (book.copies?.length || 0)}</span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full ${book.available_copies_count > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                                   {book.available_copies_count} avail
                                 </span>
