@@ -52,3 +52,10 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        if instance.status == 'RETURNED':
+            copy = instance.book_copy
+            copy.status = 'AVAILABLE'
+            copy.save()
