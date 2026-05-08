@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
-import ProfileTab from './ProfileTab';
-import InventoryTab from './InventoryTab';
-import TransactionsTab from './TransactionsTab';
-import MembersTab from './MembersTab';
+import ProfileTab from './Profile';
+import InventoryTab from './Inventory';
+import TransactionsTab from './Transactions';
+import MembersTab from './Members';
 
 function AdminDashboard({ user }) {
   const [activeTab, setActiveTab] = useState('dashboard');
