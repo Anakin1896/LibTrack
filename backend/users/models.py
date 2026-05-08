@@ -11,7 +11,9 @@ class User(AbstractUser):
         ('TEACHER', 'Teacher'),
     )
 
-    role = models.CharField(max_length=15, choices=ROLE_CHOICES, default='STUDENT')
+    role = models.CharField(max_length=15, choices=ROLE_CHOICES, default='ADMIN')
+
+    requires_password_change = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"

@@ -34,7 +34,17 @@ function AdminDashboard({ user }) {
   const [members, setMembers] = useState([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
 
-  const [dashboardModal, setDashboardModal] = useState(null);
+  const [dashboardModal, setDashboardModal] = useState(null); 
+
+  const [addingMember, setAddingMember] = useState(false);
+  const [newUser, setNewUser] = useState({
+    username: '',
+    first_name: '',
+    last_name: '',
+    email: '',
+    role: 'STUDENT',
+    password: 'libtrackpassword123'
+  });
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -96,6 +106,20 @@ function AdminDashboard({ user }) {
     }
     if (activeTab === 'members') fetchMembers();
   }, [activeTab]);
+
+  const handleAddMember = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/users/', newUser);
+      showNotification("Member successfully registered!", "success");
+      setAddingMember(false);
+      setNewUser({ username: '', first_name: '', last_name: '', email: '', role: 'STUDENT', password: 'libtrackpassword123' });
+      fetchMembers();
+    } catch (error) {
+      console.error("Failed to add member:", error.response?.data);
+      showNotification(error.response?.data?.username?.[0] || "Error registering member. Check if ID already exists.", "error");
+    }
+  };
 
   const handleAddExtraCopies = async (e) => {
     e.preventDefault();
@@ -268,6 +292,56 @@ function AdminDashboard({ user }) {
         </div>
       )}
 
+      {addingMember && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100">
+            <div className="bg-[#14291c] p-4 px-6 flex justify-between items-center">
+              <h3 className="font-serif font-bold text-lg text-white">Register New Member</h3>
+              <button onClick={() => setAddingMember(false)} className="text-emerald-200 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <form onSubmit={handleAddMember} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Student / Teacher ID (Username)</label>
+                <input required value={newUser.username} onChange={(e) => setNewUser({...newUser, username: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="e.g. jdelacruz" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">First Name</label>
+                  <input required value={newUser.first_name} onChange={(e) => setNewUser({...newUser, first_name: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Last Name</label>
+                  <input required value={newUser.last_name} onChange={(e) => setNewUser({...newUser, last_name: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Email</label>
+                  <input type="email" required value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Role</label>
+                  <select value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]">
+                    <option value="STUDENT">Student</option>
+                    <option value="TEACHER">Teacher</option>
+                    <option value="LIBRARIAN">Librarian</option>
+                  </select>
+                </div>
+              </div>
+              <div className="pt-2">
+                <p className="text-xs text-slate-400 bg-stone-50 p-3 rounded-lg border border-stone-200">
+                  <span className="font-bold text-slate-600">Note:</span> The default password for this account will be <code className="bg-stone-200 px-1 rounded text-slate-800">libtrackpassword123</code>. The user can change this later.
+                </p>
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button type="button" onClick={() => setAddingMember(false)} className="px-6 py-2.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
+                <button type="submit" className="bg-[#14291c] text-white px-6 py-2.5 rounded-lg font-bold hover:bg-[#0c1a11] transition-all shadow-md">Register Member</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {dashboardModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-100 flex flex-col max-h-[85vh]">
@@ -297,16 +371,13 @@ function AdminDashboard({ user }) {
                   ) : (
                     dashboardModal.data.map((item, idx) => (
                       <tr key={idx} className="hover:bg-stone-50 transition-colors">
-                        
                         {dashboardModal.type === 'books' && (
                           <><td className="p-4 pl-6 font-bold text-slate-900">{item.title}</td><td className="p-4 text-slate-600">{item.author}</td><td className="p-4 text-right pr-6 font-bold text-emerald-700">{item.active_copies_count ?? (item.copies?.length || 0)}</td></>
                         )}
-                        
                         {(dashboardModal.type === 'borrowed' || dashboardModal.type === 'attention') && (
                           <><td className="p-4 pl-6 font-bold text-slate-900">{item.user?.username || item.member_id}</td><td className="p-4 text-slate-600">{item.book_title}</td><td className="p-4">{new Date(item.due_date).toLocaleDateString()}</td>
                           <td className="p-4 text-right pr-6"><span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full border ${getTxStatus(item).style}`}>{getTxStatus(item).text}</span></td></>
                         )}
-
                         {dashboardModal.type === 'members' && (
                           <><td className="p-4 pl-6 font-bold text-slate-900">{item.username}</td><td className="p-4 text-slate-600">{item.first_name} {item.last_name}</td><td className="p-4 text-right pr-6 text-xs font-bold text-slate-500">{item.role || 'STUDENT'}</td></>
                         )}
@@ -316,7 +387,6 @@ function AdminDashboard({ user }) {
                 </tbody>
               </table>
             </div>
-            
             <div className="p-4 bg-stone-50 border-t border-stone-200 text-right shrink-0">
                <button onClick={() => setDashboardModal(null)} className="px-6 py-2 bg-white border border-stone-300 rounded-lg text-sm font-bold text-slate-600 hover:bg-stone-100">Close</button>
             </div>
@@ -484,10 +554,11 @@ function AdminDashboard({ user }) {
           
           {activeTab === 'dashboard' && (
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
+               
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                  <div 
                    onClick={() => setDashboardModal({ title: 'Full Library Inventory', type: 'books', data: books })}
-                   className="bg-white p-6 rounded-xl border border-stone-100 shadow-sm flex flex-col justify-between border-t-[4px] border-t-emerald-700 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all"
+                   className="bg-white p-6 rounded-xl border border-stone-100 shadow-sm flex flex-col justify-between border-t-4 border-t-emerald-700 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all"
                  >
                    <div className="flex items-start justify-between mb-2">
                      <span className="text-2xl opacity-80">📚</span>
@@ -501,7 +572,7 @@ function AdminDashboard({ user }) {
                  
                  <div 
                    onClick={() => setDashboardModal({ title: 'Currently Borrowed Books', type: 'borrowed', data: activeCheckouts })}
-                   className="bg-white p-6 rounded-xl border border-stone-100 shadow-sm flex flex-col justify-between border-t-[4px] border-t-[#e6a83a] cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all"
+                   className="bg-white p-6 rounded-xl border border-stone-100 shadow-sm flex flex-col justify-between border-t-4 border-t-[#e6a83a] cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all"
                  >
                    <div className="flex items-start justify-between mb-2">
                      <span className="text-2xl opacity-80 text-blue-500">🔄</span>
@@ -515,7 +586,7 @@ function AdminDashboard({ user }) {
                  
                  <div 
                    onClick={() => setDashboardModal({ title: 'Registered Members', type: 'members', data: members })}
-                   className="bg-white p-6 rounded-xl border border-stone-100 shadow-sm flex flex-col justify-between border-t-[4px] border-t-indigo-500 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all"
+                   className="bg-white p-6 rounded-xl border border-stone-100 shadow-sm flex flex-col justify-between border-t-4 border-t-indigo-500 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all"
                  >
                    <div className="flex items-start justify-between mb-2">
                      <span className="text-2xl opacity-80">👥</span>
@@ -529,7 +600,7 @@ function AdminDashboard({ user }) {
 
                  <div 
                    onClick={() => setDashboardModal({ title: 'Needs Attention (Overdue / Lost)', type: 'attention', data: [...overdueBooks, ...lostBooks] })}
-                   className="bg-white p-6 rounded-xl border border-stone-100 shadow-sm flex flex-col justify-between border-t-[4px] border-t-red-500 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all"
+                   className="bg-white p-6 rounded-xl border border-stone-100 shadow-sm flex flex-col justify-between border-t-4 border-t-red-500 cursor-pointer hover:shadow-md hover:-translate-y-1 transition-all"
                  >
                    <div className="flex items-start justify-between mb-2">
                      <span className="text-2xl opacity-80 text-orange-500">⚠️</span>
@@ -540,7 +611,6 @@ function AdminDashboard({ user }) {
                      <p className="text-xs text-red-500 mt-4 font-bold flex items-center gap-1">↓ Click to view overdue & lost</p>
                    </div>
                  </div>
-
                </div>
 
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -567,7 +637,7 @@ function AdminDashboard({ user }) {
                                recentBooks.map(book => (
                                 <tr key={book.id}>
                                   <td className="py-4 flex items-center gap-3">
-                                    <div className={`w-8 h-10 rounded shadow-sm flex-shrink-0 ${book.active_copies_count > 0 ? 'bg-emerald-100' : 'bg-red-50'}`}></div>
+                                    <div className={`w-8 h-10 rounded shadow-sm shrink-0 ${book.active_copies_count > 0 ? 'bg-emerald-100' : 'bg-red-50'}`}></div>
                                     <div>
                                       <p className="text-sm font-bold text-slate-800">{book.title}</p>
                                       <p className="text-[11px] text-slate-400">{book.author}</p>
@@ -608,7 +678,7 @@ function AdminDashboard({ user }) {
                                   </div>
                                   <div>
                                     <p className="text-sm font-bold text-slate-800">{tx.user?.username || tx.member_id}</p>
-                                    <p className="text-[11px] text-slate-400 truncate max-w-[200px] sm:max-w-xs">{tx.book_title}</p>
+                                    <p className="text-[11px] text-slate-400 truncate max-w-50 sm:max-w-xs">{tx.book_title}</p>
                                   </div>
                                 </div>
                                 <div className="text-right">
@@ -640,18 +710,18 @@ function AdminDashboard({ user }) {
                            <span className="text-2xl text-emerald-500">📥</span>
                            <span className="text-[10px] font-bold text-slate-700 uppercase">Return Book</span>
                          </button>
-                         <button onClick={() => setActiveTab('members')} className="py-6 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                         <button onClick={() => setAddingMember(true)} className="py-6 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
                            <span className="text-2xl text-purple-500">👤</span>
-                           <span className="text-[10px] font-bold text-slate-700 uppercase">Add new user</span>
+                           <span className="text-[10px] font-bold text-slate-700 uppercase">Add Member</span>
                          </button>
                       </div>
                     </div>
 
-                   <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 max-h-[500px] overflow-y-auto">
+                   <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 max-h-125 overflow-y-auto">
                      <div className="flex justify-between items-center mb-6">
                         <h3 className="font-serif font-bold text-lg text-slate-900">Activity Log</h3>
                       </div>
-                      <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
+                      <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-linear-to-b before:from-transparent before:via-slate-200 before:to-transparent">
                         {recentTx.length === 0 ? (
                            <p className="text-center text-sm text-slate-400">No activity yet.</p>
                         ) : (
@@ -680,6 +750,9 @@ function AdminDashboard({ user }) {
              <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
                 <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
                   <h3 className="font-serif font-bold text-lg text-slate-900">Registered Users</h3>
+                  <button onClick={() => setAddingMember(true)} className="bg-[#14291c] text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-[#0c1a11]">
+                     + Register New Member
+                  </button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
@@ -695,7 +768,7 @@ function AdminDashboard({ user }) {
                       {isLoadingMembers ? (
                         <tr><td colSpan="4" className="p-6 text-center text-slate-500">Loading members...</td></tr>
                       ) : members.length === 0 ? (
-                        <tr><td colSpan="4" className="p-6 text-center text-slate-500">No members found. Are your users connected to the API?</td></tr>
+                        <tr><td colSpan="4" className="p-6 text-center text-slate-500">No members found. Add one above!</td></tr>
                       ) : (
                         members.map((member) => (
                           <tr key={member.id || member.username} className="hover:bg-stone-50/50 transition-colors">
