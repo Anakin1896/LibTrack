@@ -482,18 +482,22 @@ function AdminDashboard({ user }) {
         </div>
       )}
 
-      <aside className="hidden lg:flex w-[260px] bg-[#14291c] text-white flex-col z-20">
+      <aside className="hidden lg:flex w-65 bg-[#14291c] text-white flex-col z-20">
         <div className="p-8 pt-10 pb-6 flex flex-col items-center">
-          <div className="w-16 h-16 bg-[#e6a83a] rounded-full flex items-center justify-center text-2xl font-serif mb-3 text-[#14291c]">{user?.first_name?.charAt(0) || 'A'}</div>
-          <h3 className="font-bold text-base tracking-wide">{user?.first_name || 'Ana'} {user?.last_name || 'Reyes'}</h3>
-          <p className="text-[11px] text-emerald-400 mb-2">Library Administrator</p>
-          <span className="px-3 py-1 bg-yellow-600/20 text-[#e6a83a] text-[9px] uppercase tracking-widest font-bold rounded-full border border-yellow-600/30">✦ Admin</span>
+          <div className="w-16 h-16 bg-[#e6a83a] rounded-full flex items-center justify-center text-2xl font-serif mb-3 text-[#14291c]">{user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'}</div>
+          <h3 className="font-bold text-base tracking-wide">{user?.first_name} {user?.last_name}</h3>
+          <p className="text-[11px] text-emerald-400 mb-2">{user?.role === 'ADMIN' ? 'Library Administrator' : 'Librarian'}</p>
+          <span className="px-3 py-1 bg-yellow-600/20 text-[#e6a83a] text-[9px] uppercase tracking-widest font-bold rounded-full border border-yellow-600/30">✦ {user?.role || 'Admin'}</span>
         </div>
         
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto mt-2">
           <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest ml-4 mb-3">Main</p>
           <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm font-medium ${activeTab === 'dashboard' ? 'bg-[#e6a83a] text-[#14291c] font-bold shadow-md' : 'text-emerald-100/70 hover:bg-emerald-800/40 hover:text-white'}`}>
             <span>⊞</span> Dashboard
+          </button>
+          
+          <button onClick={() => setActiveTab('profile')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm font-medium ${activeTab === 'profile' ? 'bg-[#e6a83a] text-[#14291c] font-bold shadow-md' : 'text-emerald-100/70 hover:bg-emerald-800/40 hover:text-white'}`}>
+            <span>👤</span> Profile
           </button>
           
           <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest ml-4 mt-6 mb-3">Library</p>
@@ -530,11 +534,12 @@ function AdminDashboard({ user }) {
           <div>
             <h1 className="text-3xl font-serif font-bold text-slate-900 mb-1">
               {activeTab === 'dashboard' && 'Dashboard'}
+              {activeTab === 'profile' && 'My Profile'}
               {activeTab === 'inventory' && 'Library Inventory'}
               {activeTab === 'transactions' && 'Transactions'}
               {activeTab === 'members' && 'Member Directory'}
             </h1>
-            <p className="text-sm text-slate-500">Welcome back, {user?.first_name || 'Ana'} — {formattedToday}</p>
+            <p className="text-sm text-slate-500">Welcome back, {user?.first_name || user?.username} — {formattedToday}</p>
           </div>
           <div className="flex items-center gap-4">
              <div className="relative">
@@ -552,6 +557,49 @@ function AdminDashboard({ user }) {
 
         <div className="flex-1 overflow-y-auto p-10">
           
+          {activeTab === 'profile' && (
+            <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
+                <div className="h-32 bg-[#14291c] relative">
+                  <div className="absolute -bottom-12 left-8 w-24 h-24 bg-[#e6a83a] rounded-full border-4 border-white flex items-center justify-center text-4xl font-serif text-[#14291c] shadow-md">
+                    {user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'}
+                  </div>
+                </div>
+                <div className="pt-16 pb-8 px-8">
+                  <h2 className="text-2xl font-serif font-bold text-slate-900">{user?.first_name} {user?.last_name}</h2>
+                  <p className="text-emerald-600 font-medium mb-6 uppercase tracking-wider text-xs">{user?.role || 'Librarian'}</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-stone-100 pt-8">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Account Details</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Username / ID</p>
+                          <p className="font-medium text-slate-900">{user?.username}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Email Address</p>
+                          <p className="font-medium text-slate-900">{user?.email || 'Not provided'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Security</h4>
+                      <p className="text-sm text-slate-500 mb-4">Keep your account secure by updating your password regularly.</p>
+                      <button 
+                        onClick={() => showNotification('Password change feature coming soon.', 'success')}
+                        className="bg-stone-50 hover:bg-stone-100 text-slate-700 px-4 py-2 rounded-lg border border-stone-200 text-sm font-bold transition-colors"
+                      >
+                        Change Password
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'dashboard' && (
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
                
