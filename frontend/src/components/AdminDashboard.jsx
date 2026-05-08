@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
+import ProfileTab from './ProfileTab';
+import InventoryTab from './InventoryTab';
+import TransactionsTab from './TransactionsTab';
+import MembersTab from './MembersTab';
+
 function AdminDashboard({ user }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const navigate = useNavigate();
@@ -114,14 +119,12 @@ function AdminDashboard({ user }) {
     const role = newUser.role;
 
     if (role === 'STUDENT') {
-
       const studentRegex = /^\d{4}-\d{5}$/; 
       if (!studentRegex.test(id)) {
         showNotification("Invalid Student ID format. Must be YYYY-NNNNN (e.g., 2024-12345)", "error");
         return; 
       }
     } else {
-
       const employeeRegex = /^EMP-\d{4}$/;
       if (!employeeRegex.test(id)) {
         showNotification("Invalid Employee ID format. Must be EMP-NNNN (e.g., EMP-0012)", "error");
@@ -587,72 +590,41 @@ function AdminDashboard({ user }) {
         <div className="flex-1 overflow-y-auto p-10">
           
           {activeTab === 'profile' && (
-            <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
-                <div className="h-32 bg-[#14291c] relative">
-                  <div className="absolute -bottom-12 left-8 w-24 h-24 bg-[#e6a83a] rounded-full border-4 border-white flex items-center justify-center text-4xl font-serif text-[#14291c] shadow-md">
-                    {user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'}
-                  </div>
-                </div>
-                <div className="pt-16 pb-8 px-8">
-                  <h2 className="text-2xl font-serif font-bold text-slate-900">{user?.first_name} {user?.last_name}</h2>
-                  <p className="text-emerald-600 font-medium mb-6 uppercase tracking-wider text-xs">{user?.role || 'User'}</p>
+            <ProfileTab user={user} showNotification={showNotification} />
+          )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-stone-100 pt-8">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Account Details</h4>
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-xs text-slate-500 mb-1">
-                            {user?.role === 'STUDENT' ? 'Student Number' : user?.role === 'TEACHER' || user?.role === 'LIBRARIAN' ? 'Employee Number' : 'Admin ID'}
-                          </p>
-                          <p className="font-medium text-slate-900">
-                            {user?.role === 'STUDENT' ? (user?.student_profile?.student_id_number || user?.username) : 
-                             user?.role === 'TEACHER' ? (user?.teacher_profile?.employee_id || user?.username) : 
-                             user?.username}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-slate-500 mb-1">Email Address</p>
-                          <p className="font-medium text-slate-900">{user?.email || 'Not provided'}</p>
-                        </div>
-                        
-                        {user?.role === 'STUDENT' && (
-                          <>
-                            <div>
-                              <p className="text-xs text-slate-500 mb-1">Course</p>
-                              <p className="font-medium text-slate-900">{user?.student_profile?.course || 'Not specified'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-slate-500 mb-1">Year Level</p>
-                              <p className="font-medium text-slate-900">{user?.student_profile?.year_level ? `Year ${user.student_profile.year_level}` : 'Not specified'}</p>
-                            </div>
-                          </>
-                        )}
+          {activeTab === 'members' && (
+             <MembersTab members={members} isLoadingMembers={isLoadingMembers} setAddingMember={setAddingMember} />
+          )}
 
-                        {user?.role === 'TEACHER' && (
-                          <div>
-                            <p className="text-xs text-slate-500 mb-1">Department</p>
-                            <p className="font-medium text-slate-900">{user?.teacher_profile?.department || 'Not specified'}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+          {activeTab === 'inventory' && (
+            <InventoryTab 
+              books={books} 
+              isLoadingBooks={isLoadingBooks} 
+              newBook={newBook} 
+              setNewBook={setNewBook} 
+              copiesToCreate={copiesToCreate} 
+              setCopiesToCreate={setCopiesToCreate} 
+              handleAddBook={handleAddBook} 
+              setAddingCopiesToBook={setAddingCopiesToBook} 
+              setEditingBook={setEditingBook} 
+              setBookToDelete={setBookToDelete} 
+            />
+          )}
 
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Security</h4>
-                      <p className="text-sm text-slate-500 mb-4">Keep your account secure by updating your password regularly.</p>
-                      <button 
-                        onClick={() => showNotification('Password change feature coming soon.', 'success')}
-                        className="bg-stone-50 hover:bg-stone-100 text-slate-700 px-4 py-2 rounded-lg border border-stone-200 text-sm font-bold transition-colors"
-                      >
-                        Change Password
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {activeTab === 'transactions' && (
+             <TransactionsTab 
+               newTx={newTx} 
+               setNewTx={setNewTx} 
+               handleIssueBook={handleIssueBook} 
+               txFilter={txFilter} 
+               setTxFilter={setTxFilter} 
+               isLoadingTx={isLoadingTx} 
+               displayedTransactions={displayedTransactions} 
+               getTxStatus={getTxStatus} 
+               setTransactionToMarkLost={setTransactionToMarkLost} 
+               handleReturnBook={handleReturnBook} 
+             />
           )}
 
           {activeTab === 'dashboard' && (
@@ -847,247 +819,6 @@ function AdminDashboard({ user }) {
                  </div>
                </div>
              </div>
-          )}
-
-          {activeTab === 'members' && (
-             <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
-                <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
-                  <h3 className="font-serif font-bold text-lg text-slate-900">Registered Users</h3>
-                  <button onClick={() => setAddingMember(true)} className="bg-[#14291c] text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-[#0c1a11]">
-                     + Register New Member
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-stone-50 text-xs text-slate-500 uppercase tracking-wider border-b border-stone-100">
-                        <th className="p-4 pl-6 font-semibold">Student/Teacher ID</th>
-                        <th className="p-4 font-semibold">Name</th>
-                        <th className="p-4 font-semibold">Email</th>
-                        <th className="p-4 font-semibold">Role</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-sm divide-y divide-stone-100 bg-white">
-                      {isLoadingMembers ? (
-                        <tr><td colSpan="4" className="p-6 text-center text-slate-500">Loading members...</td></tr>
-                      ) : members.length === 0 ? (
-                        <tr><td colSpan="4" className="p-6 text-center text-slate-500">No members found. Add one above!</td></tr>
-                      ) : (
-                        members.map((member) => (
-                          <tr key={member.id || member.username} className="hover:bg-stone-50/50 transition-colors">
-                            <td className="p-4 pl-6 font-bold text-slate-900">{member.username}</td>
-                            <td className="p-4 text-slate-600">{member.first_name} {member.last_name}</td>
-                            <td className="p-4 text-slate-600">{member.email}</td>
-                            <td className="p-4">
-                              <span className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold border ${member.role === 'ADMIN' || member.role === 'LIBRARIAN' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
-                                {member.role || 'STUDENT'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-             </div>
-          )}
-
-          {activeTab === 'inventory' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
-                <div className="bg-[#14291c] p-4 px-6 border-b border-emerald-800">
-                  <h3 className="font-serif font-bold text-lg text-white">Register New Book</h3>
-                </div>
-                <form onSubmit={handleAddBook} className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Book Title</label>
-                    <input required value={newBook.title} onChange={(e) => setNewBook({...newBook, title: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="e.g. The Great Gatsby" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ISBN</label>
-                    <input required value={newBook.isbn} onChange={(e) => setNewBook({...newBook, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="978-3-16-148410-0" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Author</label>
-                    <input required value={newBook.author} onChange={(e) => setNewBook({...newBook, author: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="Author Name" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Category</label>
-                    <select value={newBook.category} onChange={(e) => setNewBook({...newBook, category: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]">
-                      <option value="Computer Science">Computer Science</option>
-                      <option value="Fiction">Fiction</option>
-                      <option value="Science">Science</option>
-                      <option value="Mathematics">Mathematics</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Copies</label>
-                    <input type="number" required value={copiesToCreate} onChange={(e) => setCopiesToCreate(e.target.value)} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" min="1" />
-                  </div>
-                  <div className="md:col-span-3 flex justify-end mt-2">
-                    <button type="submit" className="bg-[#14291c] text-white px-8 py-3 rounded-lg font-bold hover:bg-[#0c1a11] transition-all shadow-md">
-                      Save Book to Catalog
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col">
-                <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
-                  <h3 className="font-serif font-bold text-lg text-slate-900">Full Catalog</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-stone-50 text-xs text-slate-500 uppercase tracking-wider border-b border-stone-100">
-                        <th className="p-4 pl-6 font-semibold">Title & ISBN</th>
-                        <th className="p-4 font-semibold">Author</th>
-                        <th className="p-4 font-semibold">Copies (Avail)</th>
-                        <th className="p-4 font-semibold text-right pr-6">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-sm divide-y divide-stone-100 bg-white">
-                      {isLoadingBooks ? (
-                        <tr><td colSpan="4" className="p-6 text-center text-slate-500">Loading catalog...</td></tr>
-                      ) : books.length === 0 ? (
-                        <tr><td colSpan="4" className="p-6 text-center text-slate-500">No books found. Add one above!</td></tr>
-                      ) : (
-                        books.map((book) => (
-                          <tr key={book.id} className="hover:bg-stone-50/50 transition-colors">
-                            <td className="p-4 pl-6">
-                              <p className="font-bold text-slate-900">{book.title}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">ISBN: {book.isbn}</p>
-                            </td>
-                            <td className="p-4 text-slate-600">{book.author}</td>
-                            <td className="p-4">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-700">{book.active_copies_count ?? (book.copies?.length || 0)}</span>
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${book.available_copies_count > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                  {book.available_copies_count} avail
-                                </span>
-                              </div>
-                            </td>
-                            <td className="p-4 text-right pr-6 space-x-4">
-                              <button onClick={() => setAddingCopiesToBook(book)} className="text-blue-600 font-bold text-sm hover:underline">+ Copies</button>
-                              <button onClick={() => setEditingBook(book)} className="text-[#14291c] font-bold text-sm hover:underline">Edit</button>
-                              <button onClick={() => setBookToDelete(book)} className="text-red-600 font-bold text-sm hover:underline">Delete</button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'transactions' && (
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
-             <div className="lg:col-span-1 space-y-6">
-               <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
-                 <div className="bg-[#14291c] p-4 border-b border-emerald-800">
-                   <h3 className="font-serif font-bold text-lg text-white">Issue Book</h3>
-                 </div>
-                 <form onSubmit={handleIssueBook} className="p-6 space-y-4">
-                   <div>
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Student / Teacher ID</label>
-                     <input required value={newTx.member_id} onChange={(e) => setNewTx({...newTx, member_id: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="e.g. jdelacruz" />
-                   </div>
-                   <div>
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Book ISBN</label>
-                     <input required value={newTx.isbn} onChange={(e) => setNewTx({...newTx, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="978-X-XX-XXXXXX-X" />
-                   </div>
-                   <div>
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Due Date</label>
-                     <input required type="date" value={newTx.due_date} onChange={(e) => setNewTx({...newTx, due_date: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" />
-                   </div>
-                   <button type="submit" className="w-full bg-[#14291c] text-white px-8 py-3 rounded-lg font-bold hover:bg-[#0c1a11] transition-all shadow-md mt-4">
-                     Confirm Issue
-                   </button>
-                 </form>
-               </div>
-             </div>
-
-             <div className="lg:col-span-2">
-               <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col h-full">
-                 
-                 <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
-                   <h3 className="font-serif font-bold text-lg text-slate-900">Borrowing History</h3>
-                   <div className="flex bg-stone-50 p-1 rounded-lg border border-stone-200">
-                      <button 
-                        onClick={() => setTxFilter('active')} 
-                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${txFilter === 'active' ? 'bg-white text-slate-900 shadow-sm border border-stone-200' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        Active Only
-                      </button>
-                      <button 
-                        onClick={() => setTxFilter('all')} 
-                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${txFilter === 'all' ? 'bg-white text-slate-900 shadow-sm border border-stone-200' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        All History
-                      </button>
-                   </div>
-                 </div>
-
-                 <div className="overflow-x-auto flex-1">
-                   <table className="w-full text-left border-collapse">
-                     <thead>
-                       <tr className="bg-stone-50 text-xs text-slate-500 uppercase tracking-wider border-b border-stone-100">
-                         <th className="p-4 pl-6 font-semibold">Borrower</th>
-                         <th className="p-4 font-semibold">Book Title</th>
-                         <th className="p-4 font-semibold">Due Date</th>
-                         <th className="p-4 font-semibold">Status</th>
-                         <th className="p-4 font-semibold text-right pr-6">Action</th>
-                       </tr>
-                     </thead>
-                     <tbody className="text-sm divide-y divide-stone-100 bg-white">
-                       {isLoadingTx ? (
-                          <tr><td colSpan="5" className="p-6 text-center text-slate-500">Loading transactions...</td></tr>
-                        ) : displayedTransactions.length === 0 ? (
-                          <tr><td colSpan="5" className="p-6 text-center text-slate-500">No borrowings found.</td></tr>
-                        ) : (
-                          displayedTransactions.map((tx) => {
-                            const status = getTxStatus(tx);
-                            
-                            return (
-                              <tr key={tx.id} className={`hover:bg-stone-50/50 transition-colors ${tx.status === 'RETURNED' || tx.status === 'LOST' ? 'opacity-60' : ''}`}>
-                                <td className="p-4 pl-6 font-bold text-slate-900">{tx.user?.username || tx.user || tx.member_id || "User"}</td>
-                                <td className="p-4 text-slate-600">{tx.book_title || "Unknown Book"}</td>
-                                <td className="p-4 font-medium text-slate-700">
-                                  {new Date(tx.due_date).toLocaleDateString()}
-                                </td>
-                                
-                                <td className="p-4">
-                                  <span className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full font-bold border ${status.style}`}>
-                                    {status.text}
-                                  </span>
-                                </td>
-
-                                <td className="p-4 text-right pr-6">
-                                  {tx.status === 'ACTIVE' ? (
-                                    <div className="flex items-center justify-end gap-3">
-                                      <button onClick={() => setTransactionToMarkLost(tx)} className="text-red-500 hover:text-red-700 text-xs font-bold transition-colors">
-                                        Lost?
-                                      </button>
-                                      <button onClick={() => handleReturnBook(tx.id)} className="bg-stone-100 text-[#14291c] hover:bg-emerald-100 hover:text-emerald-800 px-4 py-2 rounded-lg text-xs font-bold transition-colors border border-stone-200">
-                                        Mark as Returned
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <span className="text-xs font-bold text-stone-400 px-4 py-2">Completed</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })
-                       )}
-                     </tbody>
-                   </table>
-                 </div>
-               </div>
-             </div>
-           </div>
           )}
 
         </div>
