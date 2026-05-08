@@ -1,9 +1,18 @@
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
 from .models import Transaction
 from catalog.models import BookCopy
 
+User = get_user_model()
+
+class TransactionUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['username', 'first_name', 'last_name']
+
 class TransactionSerializer(serializers.ModelSerializer):
-    user = serializers.ReadOnlyField(source='user.username')
+
+    user = TransactionUserSerializer(read_only=True)
     book_title = serializers.ReadOnlyField(source='book_copy.book.title')
 
     class Meta:
