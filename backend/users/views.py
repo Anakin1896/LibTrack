@@ -2,8 +2,12 @@ from rest_framework import generics, viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework import status
+from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import User
+from django.contrib.auth import authenticate
 from .serializers import RegisterSerializer, UserSerializer
+from .serializers import CustomTokenObtainPairSerializer
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -21,3 +25,27 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.filter(is_superuser=False).order_by('-date_joined')
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+
+class ChangePasswordView(APIView):
+
+    permission_classes = [AllowAny] 
+
+    def post(self, request):
+        username = request.data.get('username')
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+
+        user = authenticate(username=username, password=old_password)
+        
+        if user is not None:
+            
+            user.set_password(new_password)
+            user.requires_password_change = False
+            user.save()
+
+            return Response({"message": "Password updated successfully"}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "Invalid current password."}, status=status.HTTP_400_BAD_REQUEST)

@@ -109,6 +109,26 @@ function AdminDashboard({ user }) {
 
   const handleAddMember = async (e) => {
     e.preventDefault();
+
+    const id = newUser.username;
+    const role = newUser.role;
+
+    if (role === 'STUDENT') {
+
+      const studentRegex = /^\d{4}-\d{5}$/; 
+      if (!studentRegex.test(id)) {
+        showNotification("Invalid Student ID format. Must be YYYY-NNNNN (e.g., 2024-12345)", "error");
+        return; 
+      }
+    } else {
+
+      const employeeRegex = /^EMP-\d{4}$/;
+      if (!employeeRegex.test(id)) {
+        showNotification("Invalid Employee ID format. Must be EMP-NNNN (e.g., EMP-0012)", "error");
+        return;
+      }
+    }
+
     try {
       await api.post('/users/', newUser);
       showNotification("Member successfully registered!", "success");
@@ -300,10 +320,27 @@ function AdminDashboard({ user }) {
               <button onClick={() => setAddingMember(false)} className="text-emerald-200 hover:text-white text-xl leading-none">&times;</button>
             </div>
             <form onSubmit={handleAddMember} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Student / Teacher ID (Username)</label>
-                <input required value={newUser.username} onChange={(e) => setNewUser({...newUser, username: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="e.g. jdelacruz" />
+              
+              <div className="grid grid-cols-2 gap-4 mb-2">
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Role</label>
+                  <select value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]">
+                    <option value="STUDENT">Student</option>
+                    <option value="TEACHER">Teacher</option>
+                    <option value="LIBRARIAN">Librarian</option>
+                  </select>
+                </div>
               </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  {newUser.role === 'STUDENT' ? 'Student Number (Login ID)' : 
+                   newUser.role === 'TEACHER' || newUser.role === 'LIBRARIAN' ? 'Employee Number (Login ID)' : 
+                   'Username'}
+                </label>
+                <input required value={newUser.username} onChange={(e) => setNewUser({...newUser, username: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder={newUser.role === 'STUDENT' ? 'e.g. 2023-12345' : 'e.g. EMP-9876'} />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">First Name</label>
@@ -314,20 +351,12 @@ function AdminDashboard({ user }) {
                   <input required value={newUser.last_name} onChange={(e) => setNewUser({...newUser, last_name: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Email</label>
-                  <input type="email" required value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Role</label>
-                  <select value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]">
-                    <option value="STUDENT">Student</option>
-                    <option value="TEACHER">Teacher</option>
-                    <option value="LIBRARIAN">Librarian</option>
-                  </select>
-                </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Email</label>
+                <input type="email" required value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" />
               </div>
+
               <div className="pt-2">
                 <p className="text-xs text-slate-400 bg-stone-50 p-3 rounded-lg border border-stone-200">
                   <span className="font-bold text-slate-600">Note:</span> The default password for this account will be <code className="bg-stone-200 px-1 rounded text-slate-800">libtrackpassword123</code>. The user can change this later.
@@ -358,10 +387,10 @@ function AdminDashboard({ user }) {
                       <><th className="p-4 pl-6 font-semibold">Title</th><th className="p-4 font-semibold">Author</th><th className="p-4 font-semibold text-right pr-6">Copies</th></>
                     )}
                     {(dashboardModal.type === 'borrowed' || dashboardModal.type === 'attention') && (
-                      <><th className="p-4 pl-6 font-semibold">Borrower</th><th className="p-4 font-semibold">Book Title</th><th className="p-4 font-semibold">Due Date</th><th className="p-4 font-semibold text-right pr-6">Status</th></>
+                      <><th className="p-4 pl-6 font-semibold">Borrower ID</th><th className="p-4 font-semibold">Book Title</th><th className="p-4 font-semibold">Due Date</th><th className="p-4 font-semibold text-right pr-6">Status</th></>
                     )}
                     {dashboardModal.type === 'members' && (
-                      <><th className="p-4 pl-6 font-semibold">ID</th><th className="p-4 font-semibold">Name</th><th className="p-4 font-semibold text-right pr-6">Role</th></>
+                      <><th className="p-4 pl-6 font-semibold">ID Number</th><th className="p-4 font-semibold">Name</th><th className="p-4 font-semibold text-right pr-6">Role</th></>
                     )}
                   </tr>
                 </thead>
@@ -567,20 +596,46 @@ function AdminDashboard({ user }) {
                 </div>
                 <div className="pt-16 pb-8 px-8">
                   <h2 className="text-2xl font-serif font-bold text-slate-900">{user?.first_name} {user?.last_name}</h2>
-                  <p className="text-emerald-600 font-medium mb-6 uppercase tracking-wider text-xs">{user?.role || 'Librarian'}</p>
+                  <p className="text-emerald-600 font-medium mb-6 uppercase tracking-wider text-xs">{user?.role || 'User'}</p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-stone-100 pt-8">
                     <div>
                       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Account Details</h4>
                       <div className="space-y-4">
                         <div>
-                          <p className="text-xs text-slate-500 mb-1">Username / ID</p>
-                          <p className="font-medium text-slate-900">{user?.username}</p>
+                          <p className="text-xs text-slate-500 mb-1">
+                            {user?.role === 'STUDENT' ? 'Student Number' : user?.role === 'TEACHER' || user?.role === 'LIBRARIAN' ? 'Employee Number' : 'Admin ID'}
+                          </p>
+                          <p className="font-medium text-slate-900">
+                            {user?.role === 'STUDENT' ? (user?.student_profile?.student_id_number || user?.username) : 
+                             user?.role === 'TEACHER' ? (user?.teacher_profile?.employee_id || user?.username) : 
+                             user?.username}
+                          </p>
                         </div>
                         <div>
                           <p className="text-xs text-slate-500 mb-1">Email Address</p>
                           <p className="font-medium text-slate-900">{user?.email || 'Not provided'}</p>
                         </div>
+                        
+                        {user?.role === 'STUDENT' && (
+                          <>
+                            <div>
+                              <p className="text-xs text-slate-500 mb-1">Course</p>
+                              <p className="font-medium text-slate-900">{user?.student_profile?.course || 'Not specified'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-slate-500 mb-1">Year Level</p>
+                              <p className="font-medium text-slate-900">{user?.student_profile?.year_level ? `Year ${user.student_profile.year_level}` : 'Not specified'}</p>
+                            </div>
+                          </>
+                        )}
+
+                        {user?.role === 'TEACHER' && (
+                          <div>
+                            <p className="text-xs text-slate-500 mb-1">Department</p>
+                            <p className="font-medium text-slate-900">{user?.teacher_profile?.department || 'Not specified'}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 

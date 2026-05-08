@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import api from '../api';
 
 function Login() {
-  const [username, setUsername] = useState('');
+  const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -19,7 +19,7 @@ function Login() {
     
     try {
       const response = await api.post('/users/login/', {
-        username: username,
+        username: userId,
         password: password
       });
 
@@ -38,7 +38,7 @@ function Login() {
         return; 
       }
 
-      setError(err.response?.data?.detail || "Login failed. Check your username and password.");
+      setError(err.response?.data?.detail || "Login failed. Check your ID and password.");
     }
   };
 
@@ -57,9 +57,8 @@ function Login() {
     }
 
     try {
-    
       await api.post('/users/change-password/', {
-        username: username,
+        username: userId,
         old_password: password,
         new_password: newPassword
       });
@@ -68,7 +67,7 @@ function Login() {
       setPassword(newPassword);
       
       setTimeout(() => {
-        api.post('/users/login/', { username: username, password: newPassword })
+        api.post('/users/login/', { username: userId, password: newPassword })
           .then(response => {
              localStorage.setItem('access_token', response.data.access);
              localStorage.setItem('refresh_token', response.data.refresh);
@@ -83,7 +82,6 @@ function Login() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-[#FDFCF8] font-sans relative">
-
       {showPasswordModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
@@ -157,15 +155,15 @@ function Login() {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-16">
-            <div className="w-10 h-10 bg-yellow-500 rounded-lg shadow-lg flex items-center justify-center">
-              <span className="text-xl font-bold text-white">L</span>
+            <div className="w-10 h-10 bg-[#e6a83a] rounded-lg shadow-lg flex items-center justify-center">
+              <span className="text-xl font-bold text-[#14291c]">L</span>
             </div>
             <h1 className="text-2xl font-bold tracking-wide">LibTrack</h1>
           </div>
 
           <h2 className="text-5xl font-serif font-bold leading-tight mb-6">
             Your library,<br/>
-            <span className="text-yellow-600 italic">organized</span><br/>
+            <span className="text-[#e6a83a] italic">organized</span><br/>
             at last.
           </h2>
           
@@ -176,17 +174,17 @@ function Login() {
 
         <div className="flex gap-8 mt-12 relative z-10 border-t border-emerald-800/50 pt-8">
           <div>
-            <p className="text-3xl font-bold text-yellow-600 mb-1">2,400+</p>
+            <p className="text-3xl font-bold text-[#e6a83a] mb-1">2,400+</p>
             <p className="text-sm text-emerald-100/50">Books Managed</p>
           </div>
           <div>
-            <p className="text-3xl font-bold text-yellow-600 mb-1">340</p>
+            <p className="text-3xl font-bold text-[#e6a83a] mb-1">340</p>
             <p className="text-sm text-emerald-100/50">Active Borrowers</p>
           </div>
         </div>
         <div className="mt-auto pt-10">
             <p className="text-emerald-100/30 text-xs tracking-widest uppercase font-bold">
-                © <span className="text-yellow-600/60">BugSplat</span>
+                © <span className="text-[#e6a83a]/60">LibTrack System</span>
             </p>
         </div>
       </div>
@@ -195,15 +193,15 @@ function Login() {
         <div className="w-full max-w-md">
 
           <div className="flex items-center gap-3 mb-10 lg:hidden">
-            <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-              <span className="text-lg font-bold text-white">L</span>
+            <div className="w-8 h-8 bg-[#e6a83a] rounded-md flex items-center justify-center">
+              <span className="text-lg font-bold text-[#14291c]">L</span>
             </div>
             <h1 className="text-xl font-bold text-[#1a3626]">LibTrack</h1>
           </div>
 
           <p className="text-sm font-bold tracking-widest text-emerald-800 uppercase mb-2">Welcome Back</p>
           <h2 className="text-4xl font-serif font-bold text-slate-900 mb-2">Sign in to LibTrack</h2>
-          <p className="text-slate-500 mb-10">Enter your library credentials to continue.</p>
+          <p className="text-slate-500 mb-10">Enter your credentials to continue.</p>
 
           <form onSubmit={handleLogin} className="space-y-6">
 
@@ -215,13 +213,13 @@ function Login() {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Username
+                Student / Employee ID
               </label>
               <input 
                 type="text" 
-                placeholder="e.g. jdelacruz"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g. 2023-12345 or EMP-001"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
                 className="w-full px-4 py-3 bg-stone-100 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a3626] transition-all"
                 required
               />
@@ -253,7 +251,7 @@ function Login() {
 
             <button 
               type="submit" 
-              className="w-full py-3.5 bg-[#1a3626] hover:bg-[#12261a] text-white font-semibold rounded-lg shadow-md transition-colors mt-4 flex justify-center items-center gap-2"
+              className="w-full py-3.5 bg-[#14291c] hover:bg-[#0c1a11] text-white font-semibold rounded-lg shadow-md transition-colors mt-4 flex justify-center items-center gap-2"
             >
               Sign In <span>→</span>
             </button>
@@ -263,7 +261,7 @@ function Login() {
             <p className="text-slate-500 text-sm">
               Don't have an account?{' '}
               <Link to="/register" className="font-bold text-[#1a3626] hover:underline transition-all">
-                Create one
+                Contact Librarian
               </Link>
             </p>
           </div>
