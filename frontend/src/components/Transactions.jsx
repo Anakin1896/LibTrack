@@ -2,6 +2,7 @@ import { useState } from 'react';
 import api from '../api';
 
 function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks, showNotification }) {
+
   const [txFilter, setTxFilter] = useState('active'); 
   const [newTx, setNewTx] = useState({ member_id: '', isbn: '', due_date: '' });
   const [transactionToMarkLost, setTransactionToMarkLost] = useState(null);
@@ -34,8 +35,26 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
     finally { setTransactionToMarkLost(null); }
   };
 
+  const handleApproveReservation = async (transactionId) => {
+    try {
+      await api.patch(`/transactions/${transactionId}/`, { status: 'ACTIVE' });
+      showNotification("Reservation approved! Book is now issued.", "success");
+      fetchTransactions(); fetchBooks();
+    } catch (error) { showNotification("Error approving reservation.", "error"); }
+  };
+
+  const handleDenyReservation = async (transactionId) => {
+    try {
+      await api.patch(`/transactions/${transactionId}/`, { status: 'CANCELLED' });
+      showNotification("Reservation denied and cancelled.", "success");
+      fetchTransactions(); fetchBooks();
+    } catch (error) { showNotification("Error cancelling reservation.", "error"); }
+  };
+
   const getTxStatus = (tx) => {
     if (tx.status === 'LOST') return { text: 'Lost', style: 'bg-slate-800 text-white border-slate-900' };
+    if (tx.status === 'CANCELLED') return { text: 'Cancelled', style: 'bg-stone-100 text-stone-500 border-stone-200' };
+    if (tx.status === 'PENDING') return { text: 'Pending', style: 'bg-purple-100 text-purple-800 border-purple-200' };
     
     if (tx.status === 'RETURNED') {
       if (tx.return_date && new Date(tx.return_date).setHours(0,0,0,0) > new Date(tx.due_date).setHours(0,0,0,0)) {
@@ -52,7 +71,13 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
     return { text: 'Active', style: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
   };
 
-  const displayedTransactions = transactions.filter(tx => txFilter === 'active' ? tx.status === 'ACTIVE' : true);
+  const pendingCount = transactions.filter(tx => tx.status === 'PENDING').length;
+
+  const displayedTransactions = transactions.filter(tx => {
+    if (txFilter === 'active') return tx.status === 'ACTIVE';
+    if (txFilter === 'pending') return tx.status === 'PENDING';
+    return true; 
+  });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
@@ -73,6 +98,10 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
           <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
             <h3 className="font-serif font-bold text-lg text-slate-900">Borrowing History</h3>
             <div className="flex bg-stone-50 p-1 rounded-lg border border-stone-200">
+               <button onClick={() => setTxFilter('pending')} className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 ${txFilter === 'pending' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500'}`}>
+                 Pending 
+                 {pendingCount > 0 && <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-full text-[10px]">{pendingCount}</span>}
+               </button>
                <button onClick={() => setTxFilter('active')} className={`px-4 py-1.5 text-xs font-bold rounded-md ${txFilter === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Active Only</button>
                <button onClick={() => setTxFilter('all')} className={`px-4 py-1.5 text-xs font-bold rounded-md ${txFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>All History</button>
             </div>
@@ -93,7 +122,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                 {isLoadingTx ? (
                    <tr><td colSpan="6" className="p-6 text-center text-slate-500">Loading transactions...</td></tr>
                  ) : displayedTransactions.length === 0 ? (
-                   <tr><td colSpan="6" className="p-6 text-center text-slate-500">No borrowings found.</td></tr>
+                   <tr><td colSpan="6" className="p-6 text-center text-slate-500">No records found for this filter.</td></tr>
                  ) : (
                    displayedTransactions.map((tx) => {
                      const status = getTxStatus(tx);
@@ -102,19 +131,28 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                        : '-';
 
                      return (
-                       <tr key={tx.id} className={`hover:bg-stone-50/50 ${tx.status === 'RETURNED' || tx.status === 'LOST' ? 'opacity-60' : ''}`}>
+                       <tr key={tx.id} className={`hover:bg-stone-50/50 ${tx.status === 'RETURNED' || tx.status === 'LOST' || tx.status === 'CANCELLED' ? 'opacity-60' : ''}`}>
                          <td className="p-4 pl-6 font-bold">{tx.user?.username || tx.member_id || "Unknown"}</td>
                          <td className="p-4 text-slate-600">{borrowerName}</td>
                          <td className="p-4">{tx.book_title}</td>
                          <td className="p-4">{new Date(tx.due_date).toLocaleDateString()}</td>
-                         <td className="p-4"><span className={`text-[10px] uppercase px-2 py-1 rounded-full font-bold border ${status.style}`}>{status.text}</span></td>
+                         <td className="p-4"><span className={`text-[10px] uppercase px-2 py-1 rounded-full font-bold border whitespace-nowrap ${status.style}`}>{status.text}</span></td>
                          <td className="p-4 text-right pr-6">
-                           {tx.status === 'ACTIVE' ? (
+                           
+                           {tx.status === 'PENDING' ? (
+                             <div className="flex items-center justify-end gap-2">
+                               <button onClick={() => handleDenyReservation(tx.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-red-100">Deny</button>
+                               <button onClick={() => handleApproveReservation(tx.id)} className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-emerald-200">Approve</button>
+                             </div>
+                           ) : tx.status === 'ACTIVE' ? (
                              <div className="flex items-center justify-end gap-3">
                                <button onClick={() => setTransactionToMarkLost(tx)} className="text-red-500 hover:text-red-700 text-xs font-bold">Lost?</button>
                                <button onClick={() => handleReturnBook(tx.id)} className="bg-stone-100 px-4 py-2 rounded-lg text-xs font-bold text-[#14291c] hover:bg-emerald-100 hover:text-emerald-800 border border-stone-200 transition-colors">Return</button>
                              </div>
-                           ) : (<span className="text-xs font-bold text-stone-400 px-4 py-2">Completed</span>)}
+                           ) : (
+                             <span className="text-xs font-bold text-stone-400 px-4 py-2">Completed</span>
+                           )}
+
                          </td>
                        </tr>
                      );
