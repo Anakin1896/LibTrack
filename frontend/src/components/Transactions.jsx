@@ -36,10 +36,19 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
 
   const getTxStatus = (tx) => {
     if (tx.status === 'LOST') return { text: 'Lost', style: 'bg-slate-800 text-white border-slate-900' };
-    if (tx.status === 'RETURNED') return { text: 'Returned', style: 'bg-stone-100 text-stone-600 border-stone-200' };
+    
+    if (tx.status === 'RETURNED') {
+      if (tx.return_date && new Date(tx.return_date).setHours(0,0,0,0) > new Date(tx.due_date).setHours(0,0,0,0)) {
+         return { text: 'Returned Late', style: 'bg-yellow-100 text-yellow-800 border-yellow-300' };
+      }
+      return { text: 'Returned', style: 'bg-stone-100 text-stone-600 border-stone-200' };
+    }
+
     const diffDays = Math.ceil((new Date(tx.due_date).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
+    
     if (diffDays < 0) return { text: 'Overdue', style: 'bg-red-100 text-red-800 border-red-200' };
     if (diffDays <= 3) return { text: 'Due Soon', style: 'bg-orange-100 text-orange-800 border-orange-200' };
+    
     return { text: 'Active', style: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
   };
 
