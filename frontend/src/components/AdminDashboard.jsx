@@ -92,13 +92,59 @@ function AdminDashboard({ user }) {
               <h3 className="font-serif font-bold text-lg text-white">{dashboardModal.title}</h3>
               <button onClick={() => setDashboardModal(null)} className="text-emerald-200 hover:text-white text-xl leading-none">&times;</button>
             </div>
-            <div className="overflow-y-auto p-8"><p className="text-center text-slate-500">Summary list mapped here from dashboardModal.data...</p></div>
-            <div className="p-4 bg-stone-50 border-t text-right"><button onClick={() => setDashboardModal(null)} className="px-6 py-2 bg-white border rounded-lg text-sm font-bold text-slate-600 hover:bg-stone-100">Close</button></div>
+            
+            <div className="overflow-y-auto p-0 flex-1">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-stone-50 text-xs text-slate-500 uppercase tracking-wider sticky top-0 border-b border-stone-200 shadow-sm z-10">
+                  <tr>
+                    {dashboardModal.type === 'books' && (
+                      <><th className="p-4 pl-6 font-semibold">Title</th><th className="p-4 font-semibold">Author</th><th className="p-4 font-semibold text-right pr-6">Copies</th></>
+                    )}
+                    {(dashboardModal.type === 'borrowed' || dashboardModal.type === 'attention') && (
+                      <><th className="p-4 pl-6 font-semibold">Borrower ID</th><th className="p-4 font-semibold">Book Title</th><th className="p-4 font-semibold">Due Date</th><th className="p-4 font-semibold text-right pr-6">Status</th></>
+                    )}
+                    {dashboardModal.type === 'members' && (
+                      <><th className="p-4 pl-6 font-semibold">ID Number</th><th className="p-4 font-semibold">Name</th><th className="p-4 font-semibold text-right pr-6">Role</th></>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="text-sm divide-y divide-stone-100 bg-white">
+                  {dashboardModal.data.length === 0 ? (
+                    <tr><td colSpan="4" className="p-8 text-center text-slate-400">No records found.</td></tr>
+                  ) : (
+                    dashboardModal.data.map((item, idx) => {
+                      const isOverdue = item.due_date ? Math.ceil((new Date(item.due_date).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24)) < 0 : false;
+                      
+                      return (
+                      <tr key={idx} className="hover:bg-stone-50 transition-colors">
+                        {dashboardModal.type === 'books' && (
+                          <><td className="p-4 pl-6 font-bold text-slate-900">{item.title}</td><td className="p-4 text-slate-600">{item.author}</td><td className="p-4 text-right pr-6 font-bold text-emerald-700">{item.active_copies_count ?? (item.copies?.length || 0)}</td></>
+                        )}
+                        {(dashboardModal.type === 'borrowed' || dashboardModal.type === 'attention') && (
+                          <><td className="p-4 pl-6 font-bold text-slate-900">{item.user?.username || item.member_id}</td><td className="p-4 text-slate-600">{item.book_title}</td><td className="p-4">{new Date(item.due_date).toLocaleDateString()}</td>
+                          <td className="p-4 text-right pr-6">
+                            <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full border ${item.status === 'LOST' ? 'bg-slate-800 text-white border-slate-900' : isOverdue ? 'bg-red-100 text-red-800 border-red-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
+                              {item.status === 'LOST' ? 'Lost' : isOverdue ? 'Overdue' : 'Active'}
+                            </span>
+                          </td></>
+                        )}
+                        {dashboardModal.type === 'members' && (
+                          <><td className="p-4 pl-6 font-bold text-slate-900">{item.username}</td><td className="p-4 text-slate-600">{item.first_name} {item.last_name}</td><td className="p-4 text-right pr-6 text-xs font-bold text-slate-500">{item.role || 'STUDENT'}</td></>
+                        )}
+                      </tr>
+                    )})
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-4 bg-stone-50 border-t border-stone-200 text-right shrink-0">
+               <button onClick={() => setDashboardModal(null)} className="px-6 py-2 bg-white border border-stone-300 rounded-lg text-sm font-bold text-slate-600 hover:bg-stone-100">Close</button>
+            </div>
           </div>
         </div>
       )}
 
-      <aside className="hidden lg:flex w-65 bg-[#14291c] text-white flex-col z-20">
+      <aside className="hidden lg:flex w-[260px] bg-[#14291c] text-white flex-col z-20">
         <div className="p-8 pt-10 pb-6 flex flex-col items-center">
           <div className="w-16 h-16 bg-[#e6a83a] rounded-full flex items-center justify-center text-2xl font-serif mb-3 text-[#14291c]">{user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'}</div>
           <h3 className="font-bold text-base tracking-wide">{user?.first_name} {user?.last_name}</h3>
@@ -205,10 +251,26 @@ function AdminDashboard({ user }) {
                  <div className="space-y-8">
                    <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
                       <h3 className="font-serif font-bold text-lg text-slate-900 mb-4">Quick Actions</h3>
+                      
                       <div className="grid grid-cols-2 gap-3">
-                         <button onClick={() => setActiveTab('inventory')} className="py-6 bg-stone-50 hover:bg-stone-100 rounded-xl flex flex-col items-center justify-center gap-2"><span className="text-2xl text-indigo-500">➕</span><span className="text-[10px] font-bold text-slate-700 uppercase">Add Book</span></button>
-                         <button onClick={() => setActiveTab('transactions')} className="py-6 bg-stone-50 hover:bg-stone-100 rounded-xl flex flex-col items-center justify-center gap-2"><span className="text-2xl text-blue-500">🔄</span><span className="text-[10px] font-bold text-slate-700 uppercase">Issue Book</span></button>
+                         <button onClick={() => setActiveTab('inventory')} className="py-6 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                           <span className="text-2xl text-indigo-500">➕</span>
+                           <span className="text-[10px] font-bold text-slate-700 uppercase">Add Book</span>
+                         </button>
+                         <button onClick={() => setActiveTab('transactions')} className="py-6 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                           <span className="text-2xl text-blue-500">🔄</span>
+                           <span className="text-[10px] font-bold text-slate-700 uppercase">Issue Book</span>
+                         </button>
+                         <button onClick={() => setActiveTab('transactions')} className="py-6 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                           <span className="text-2xl text-emerald-500">📥</span>
+                           <span className="text-[10px] font-bold text-slate-700 uppercase">Return Book</span>
+                         </button>
+                         <button onClick={() => setActiveTab('members')} className="py-6 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors">
+                           <span className="text-2xl text-purple-500">👤</span>
+                           <span className="text-[10px] font-bold text-slate-700 uppercase">Members Tab</span>
+                         </button>
                       </div>
+
                     </div>
                  </div>
                </div>
