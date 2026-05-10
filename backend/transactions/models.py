@@ -9,11 +9,13 @@ def get_default_due_date():
 
 class Transaction(models.Model):
     STATUS_CHOICES = (
+        ('PENDING', 'Pending'),
         ('RESERVED', 'Reserved'), 
         ('ACTIVE', 'Active'),     
         ('RETURNED', 'Returned'), 
         ('OVERDUE', 'Overdue'),
         ('LOST', 'Lost'),
+        ('CANCELLED', 'Cancelled'),
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='transactions')
