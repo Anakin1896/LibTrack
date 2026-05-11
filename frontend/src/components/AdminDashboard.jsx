@@ -282,7 +282,7 @@ function AdminDashboard({ user }) {
         </div>
       )}
 
-      <aside className="hidden lg:flex w-[260px] bg-[#14291c] text-white flex-col z-20">
+      <aside className="hidden lg:flex w-65 bg-[#14291c] text-white flex-col z-20">
         <div className="p-8 pt-10 pb-6 flex flex-col items-center">
           <div className="w-16 h-16 bg-[#e6a83a] rounded-full flex items-center justify-center text-2xl font-serif mb-3 text-[#14291c]">{user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'}</div>
           <h3 className="font-bold text-base tracking-wide">{user?.first_name} {user?.last_name}</h3>
