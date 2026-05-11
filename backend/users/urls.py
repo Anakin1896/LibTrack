@@ -5,8 +5,8 @@ from .views import CurrentUserView, RegisterView, UserViewSet, CustomTokenObtain
 from users.views import NotificationViewSet
 
 router = DefaultRouter()
-router.register(r'', UserViewSet, basename='user')
 router.register(r'notifications', NotificationViewSet, basename='notification')
+router.register(r'', UserViewSet, basename='user')
 
 urlpatterns = [
     path('login/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),

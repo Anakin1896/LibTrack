@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
@@ -16,33 +16,60 @@ function MemberDashboard({ user }) {
   
   const [isLoading, setIsLoading] = useState(true);
 
+  const notifRef = useRef(null);
+
   const navigate = useNavigate(); 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   useEffect(() => {
+    function handleClickOutside(event) {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [notifRef]);
+
+  useEffect(() => {
     const fetchMemberData = async () => {
       setIsLoading(true);
+      
       try {
-        const [booksRes, txRes, notifRes] = await Promise.all([
-          api.get('/catalog/books/'),
-          api.get('/transactions/'),
-          api.get('/notifications/') 
-        ]);
-        
-        setBooks(Array.isArray(booksRes.data.results) ? booksRes.data.results : booksRes.data);
+        try {
+          const booksRes = await api.get('/catalog/books/');
+          setBooks(Array.isArray(booksRes.data.results) ? booksRes.data.results : booksRes.data);
+        } catch (bookErr) {
+          console.error("Failed to load books:", bookErr);
+          setBooks([]);
+        }
 
-        const allTx = Array.isArray(txRes.data.results) ? txRes.data.results : txRes.data;
-        const userTransactions = allTx.filter(tx => 
-          (tx.user && tx.user.id === user?.id) || 
-          (tx.member_id === user?.username) || 
-          (tx.member_id === user?.member_id)
-        );
-        setMyTransactions(userTransactions);
+        try {
+          const txRes = await api.get('/transactions/');
+          const allTx = Array.isArray(txRes.data.results) ? txRes.data.results : txRes.data;
+          const userTransactions = allTx.filter(tx => 
+            (tx.user && tx.user.id === user?.id) || 
+            (tx.member_id === user?.username) || 
+            (tx.member_id === user?.member_id)
+          );
+          setMyTransactions(userTransactions);
+        } catch (txErr) {
+          console.error("Failed to load transactions:", txErr);
+          setMyTransactions([]);
+        }
         
-        setNotifications(Array.isArray(notifRes.data.results) ? notifRes.data.results : notifRes.data);
+        try {
+          const notifRes = await api.get('/users/notifications/');
+          setNotifications(Array.isArray(notifRes.data.results) ? notifRes.data.results : notifRes.data);
+        } catch (notifErr) {
+          console.warn("Notifications not ready yet:", notifErr);
+          setNotifications([]); 
+        }
         
-      } catch (error) {
-        console.error("Error fetching member data", error);
       } finally {
         setIsLoading(false);
       }
@@ -61,7 +88,7 @@ function MemberDashboard({ user }) {
 
   const markAsRead = async (id) => {
     try {
-      await api.patch(`/notifications/${id}/`, { is_read: true });
+      await api.patch(`/users/notifications/${id}/`, { is_read: true });
       setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
     } catch (error) {
       console.error("Failed to mark notification as read");
@@ -132,8 +159,8 @@ function MemberDashboard({ user }) {
             </h1>
             <p className="text-sm text-slate-500 mt-1">Welcome back, {user?.first_name || 'Member'} — {today}</p>
           </div>
-          
-          <div className="relative">
+
+          <div className="relative" ref={notifRef}>
             <button onClick={() => setShowNotifications(!showNotifications)} className="p-3 bg-stone-50 hover:bg-stone-100 rounded-full border border-stone-200 transition-colors relative">
               <span className="text-lg">🔔</span>
               {unreadCount > 0 && <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">{unreadCount}</span>}
