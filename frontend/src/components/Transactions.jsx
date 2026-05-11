@@ -1,11 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks, showNotification }) {
 
   const [txFilter, setTxFilter] = useState('active'); 
   const [newTx, setNewTx] = useState({ member_id: '', isbn: '', due_date: '' });
   const [transactionToMarkLost, setTransactionToMarkLost] = useState(null);
+
+  const [isScanning, setIsScanning] = useState(false);
+
+  useEffect(() => {
+    if (isScanning) {
+      const scanner = new Html5QrcodeScanner(
+        "qr-reader-tx", 
+        { fps: 10, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true },
+        false
+      );
+
+      scanner.render(
+        (decodedText) => {
+
+          scanner.clear();
+          setIsScanning(false);
+
+          const isbnMatch = decodedText.match(/ISBN:\s*([^\n]+)/);
+          const scannedIsbn = isbnMatch ? isbnMatch[1].trim() : decodedText.trim();
+
+          setNewTx(prev => ({ ...prev, isbn: scannedIsbn }));
+          showNotification("Book scanned successfully!", "success");
+        },
+        (error) => {}
+      );
+
+      return () => {
+        scanner.clear().catch(error => console.error("Failed to clear scanner", error));
+      };
+    }
+  }, [isScanning]);
 
   const handleIssueBook = async (e) => {
     e.preventDefault();
@@ -85,10 +117,27 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
         <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
           <div className="bg-[#14291c] p-4 border-b border-emerald-800"><h3 className="font-serif font-bold text-lg text-white">Issue Book</h3></div>
           <form onSubmit={handleIssueBook} className="p-6 space-y-4">
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-2">ID</label><input required value={newTx.member_id} onChange={(e) => setNewTx({...newTx, member_id: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" /></div>
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-2">Book ISBN</label><input required value={newTx.isbn} onChange={(e) => setNewTx({...newTx, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" /></div>
-            <div><label className="block text-xs font-bold text-slate-500 uppercase mb-2">Due Date</label><input required type="date" value={newTx.due_date} onChange={(e) => setNewTx({...newTx, due_date: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" /></div>
-            <button type="submit" className="w-full bg-[#14291c] text-white px-8 py-3 rounded-lg font-bold">Confirm Issue</button>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Student/Member ID</label>
+              <input required value={newTx.member_id} onChange={(e) => setNewTx({...newTx, member_id: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="Enter ID..." />
+            </div>
+
+            <div>
+              <div className="flex justify-between items-end mb-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase">Book ISBN</label>
+                <button type="button" onClick={() => setIsScanning(true)} className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-bold hover:bg-indigo-100 flex items-center gap-1 border border-indigo-100 transition-colors">
+                  <span>📷</span> Scan QR
+                </button>
+              </div>
+              <input required value={newTx.isbn} onChange={(e) => setNewTx({...newTx, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="Scan or type ISBN..." />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Due Date</label>
+              <input required type="date" value={newTx.due_date} onChange={(e) => setNewTx({...newTx, due_date: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" />
+            </div>
+            
+            <button type="submit" className="w-full bg-[#14291c] text-white px-8 py-3 rounded-lg font-bold hover:bg-[#0c1a11] transition-colors shadow-md mt-2">Confirm Issue</button>
           </form>
         </div>
       </div>
@@ -98,12 +147,12 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
           <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
             <h3 className="font-serif font-bold text-lg text-slate-900">Borrowing History</h3>
             <div className="flex bg-stone-50 p-1 rounded-lg border border-stone-200">
-               <button onClick={() => setTxFilter('pending')} className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 ${txFilter === 'pending' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500'}`}>
+               <button onClick={() => setTxFilter('pending')} className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 ${txFilter === 'pending' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                  Pending 
                  {pendingCount > 0 && <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-full text-[10px]">{pendingCount}</span>}
                </button>
-               <button onClick={() => setTxFilter('active')} className={`px-4 py-1.5 text-xs font-bold rounded-md ${txFilter === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Active Only</button>
-               <button onClick={() => setTxFilter('all')} className={`px-4 py-1.5 text-xs font-bold rounded-md ${txFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>All History</button>
+               <button onClick={() => setTxFilter('active')} className={`px-4 py-1.5 text-xs font-bold rounded-md ${txFilter === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Active Only</button>
+               <button onClick={() => setTxFilter('all')} className={`px-4 py-1.5 text-xs font-bold rounded-md ${txFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>All History</button>
             </div>
           </div>
           <div className="overflow-x-auto flex-1">
@@ -163,6 +212,24 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
           </div>
         </div>
       </div>
+
+      {isScanning && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 text-center flex flex-col">
+              <div className="bg-indigo-900 p-4 px-6 flex justify-between items-center">
+                <h3 className="font-serif font-bold text-lg text-white">📷 Scan Book to Issue</h3>
+                <button onClick={() => setIsScanning(false)} className="text-indigo-200 hover:text-white text-xl leading-none">&times;</button>
+              </div>
+              <div className="p-6 bg-stone-50">
+                 <p className="text-sm text-slate-500 mb-4">Position the book's QR code inside the frame to automatically extract the ISBN.</p>
+                 <div id="qr-reader-tx" className="mx-auto overflow-hidden rounded-xl border-2 border-indigo-200 bg-black"></div>
+              </div>
+              <div className="p-4 bg-white border-t border-stone-100">
+                <button onClick={() => setIsScanning(false)} className="w-full px-4 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors border border-stone-200">Cancel Scanning</button>
+              </div>
+           </div>
+        </div>
+      )}
       
       {transactionToMarkLost && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">

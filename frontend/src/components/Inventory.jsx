@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api';
+import { QRCodeCanvas } from 'qrcode.react';
+import { Html5QrcodeScanner } from 'html5-qrcode'; 
 
 function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
   const [newBook, setNewBook] = useState({ title: '', isbn: '', author: '', category: 'Computer Science', publication_year: new Date().getFullYear() });
@@ -8,6 +10,61 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
   const [bookToDelete, setBookToDelete] = useState(null);
   const [addingCopiesToBook, setAddingCopiesToBook] = useState(null);
   const [extraCopiesCount, setExtraCopiesCount] = useState('1');
+  const [qrBook, setQrBook] = useState(null);
+
+  const [isScanning, setIsScanning] = useState(false);
+  const [scannedBook, setScannedBook] = useState(null);
+
+  const [scannedCopiesCount, setScannedCopiesCount] = useState('1');
+
+  useEffect(() => {
+    if (isScanning) {
+      const scanner = new Html5QrcodeScanner(
+        "qr-reader", 
+        { fps: 10, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true },
+        false
+      );
+
+      scanner.render(
+        (decodedText) => {
+          scanner.clear();
+          setIsScanning(false);
+          
+          const isbnMatch = decodedText.match(/ISBN:\s*([^\n]+)/);
+          const scannedIsbn = isbnMatch ? isbnMatch[1].trim() : decodedText.trim();
+          
+          const foundBook = books.find(b => b.isbn === scannedIsbn);
+          
+          if (foundBook) {
+            setScannedBook(foundBook);
+            setScannedCopiesCount('1');
+          } else {
+            showNotification(`No book found for ISBN: ${scannedIsbn}`, "error");
+          }
+        },
+        (error) => {}
+      );
+
+      return () => {
+        scanner.clear().catch(error => console.error("Failed to clear scanner", error));
+      };
+    }
+  }, [isScanning, books]);
+
+  const handleConfirmScannedCopy = async () => {
+    const count = parseInt(scannedCopiesCount, 10) || 1;
+    try {
+      for (let i = 0; i < count; i++) {
+        await api.post('/catalog/copies/', { book: scannedBook.id, status: 'AVAILABLE' });
+      }
+      fetchBooks();
+      setScannedBook(null);
+      setScannedCopiesCount('1');
+      showNotification(`Successfully added ${count} ${count === 1 ? 'copy' : 'copies'}!`, "success");
+    } catch (error) { 
+      showNotification("Error adding copies.", "error"); 
+    }
+  };
 
   const handleAddBook = async (e) => {
     e.preventDefault();
@@ -50,6 +107,55 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
     } catch (error) { showNotification("Error adding copies.", "error"); }
   };
 
+  const handlePrintQRSticker = (e) => {
+    e.preventDefault();
+    const canvas = document.getElementById('qr-canvas');
+    if (!canvas) return;
+    const pngUrl = canvas.toDataURL("image/png");
+
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    iframe.contentDocument.write(`
+      <html>
+        <head>
+          <title>Print QR - ${qrBook.title}</title>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; padding: 20px; }
+            .sticker { border: 2px dashed #ccc; padding: 20px; text-align: center; width: 250px; border-radius: 8px; }
+            .school-name { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #14291c; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+            h3 { font-size: 14px; margin: 10px 0 5px; color: #14291c; font-weight: 800; line-height: 1.2; }
+            p { font-size: 11px; color: #555; margin: 0; }
+            img { max-width: 150px; height: auto; margin-bottom: 5px; }
+            @media print { 
+              body { padding: 0; } 
+              .sticker { border: none; padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="sticker">
+            <div class="school-name">JPNHS Library</div>
+            <img src="${pngUrl}" alt="QR Code" />
+            <h3>${qrBook.title}</h3>
+            <p>ISBN: ${qrBook.isbn}</p>
+          </div>
+        </body>
+      </html>
+    `);
+    iframe.contentDocument.close();
+
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        setQrBook(null);
+      }, 1000);
+    }, 250);
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
@@ -65,7 +171,12 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white"><h3 className="font-serif font-bold text-lg text-slate-900">Full Catalog</h3></div>
+        <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
+           <h3 className="font-serif font-bold text-lg text-slate-900">Full Catalog</h3>
+           <button onClick={() => setIsScanning(true)} className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-100 flex items-center gap-2 transition-colors border border-indigo-100">
+             <span>📷</span> Scan QR to Add Copy
+           </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead><tr className="bg-stone-50 text-xs text-slate-500 uppercase tracking-wider border-b border-stone-100"><th className="p-4 pl-6 font-semibold">Title & ISBN</th><th className="p-4 font-semibold">Author</th><th className="p-4 font-semibold">Copies (Avail)</th><th className="p-4 font-semibold text-right pr-6">Action</th></tr></thead>
@@ -77,10 +188,11 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
                   <td className="p-4 pl-6"><p className="font-bold text-slate-900">{book.title}</p><p className="text-xs text-slate-500 mt-0.5">ISBN: {book.isbn}</p></td>
                   <td className="p-4 text-slate-600">{book.author}</td>
                   <td className="p-4"><span className="font-bold text-slate-700">{book.active_copies_count ?? (book.copies?.length || 0)}</span> <span className={`text-xs px-2 py-0.5 rounded-full ${book.available_copies_count > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{book.available_copies_count} avail</span></td>
-                  <td className="p-4 text-right pr-6 space-x-4">
-                    <button onClick={() => setAddingCopiesToBook(book)} className="text-blue-600 font-bold text-sm hover:underline">+ Copies</button>
-                    <button onClick={() => setEditingBook(book)} className="text-[#14291c] font-bold text-sm hover:underline">Edit</button>
-                    <button onClick={() => setBookToDelete(book)} className="text-red-600 font-bold text-sm hover:underline">Delete</button>
+                  <td className="p-4 text-right pr-6 space-x-3">
+                    <button onClick={() => setQrBook(book)} className="text-purple-600 font-bold text-xs hover:underline bg-purple-50 px-2 py-1 rounded-md">QR Code</button>
+                    <button onClick={() => setAddingCopiesToBook(book)} className="text-blue-600 font-bold text-xs hover:underline">+ Copies</button>
+                    <button onClick={() => setEditingBook(book)} className="text-[#14291c] font-bold text-xs hover:underline">Edit</button>
+                    <button onClick={() => setBookToDelete(book)} className="text-red-600 font-bold text-xs hover:underline">Delete</button>
                   </td>
                 </tr>
               ))}
@@ -88,6 +200,90 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
           </table>
         </div>
       </div>
+
+      {isScanning && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 text-center flex flex-col">
+              <div className="bg-indigo-900 p-4 px-6 flex justify-between items-center">
+                <h3 className="font-serif font-bold text-lg text-white">📷 Scan Book QR</h3>
+                <button onClick={() => setIsScanning(false)} className="text-indigo-200 hover:text-white text-xl leading-none">&times;</button>
+              </div>
+              <div className="p-6 bg-stone-50">
+                 <p className="text-sm text-slate-500 mb-4">Position the book's QR code inside the frame to automatically add copies to the inventory.</p>
+                 <div id="qr-reader" className="mx-auto overflow-hidden rounded-xl border-2 border-indigo-200 bg-white min-h-62.5"></div>
+              </div>
+              <div className="p-4 bg-white border-t border-stone-100">
+                <button onClick={() => setIsScanning(false)} className="w-full px-4 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors border border-stone-200">Cancel Scanning</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {scannedBook && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 text-center flex flex-col">
+              <div className="bg-emerald-700 p-4 px-6 flex justify-between items-center">
+                <h3 className="font-serif font-bold text-lg text-white">✅ QR Code Detected</h3>
+                <button onClick={() => { setScannedBook(null); setScannedCopiesCount('1'); }} className="text-emerald-200 hover:text-white text-xl leading-none">&times;</button>
+              </div>
+              
+              <div className="p-8 bg-stone-50 border-b border-stone-100">
+                 <h4 className="font-bold text-slate-900 text-xl leading-tight mb-2">{scannedBook.title}</h4>
+                 <p className="text-sm text-slate-600">By {scannedBook.author}</p>
+                 <span className="inline-block mt-3 px-3 py-1 bg-stone-200 text-slate-700 text-xs font-mono font-bold rounded-full border border-stone-300">ISBN: {scannedBook.isbn}</span>
+              </div>
+
+              <div className="p-6 bg-white">
+                <div className="mb-6 text-left">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Number of Copies to Add</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    required 
+                    value={scannedCopiesCount} 
+                    onChange={(e) => setScannedCopiesCount(e.target.value)} 
+                    className="w-full text-center text-xl p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-emerald-600" 
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => { setScannedBook(null); setScannedCopiesCount('1'); }} className="w-1/2 px-4 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors border border-stone-200">Cancel</button>
+                  <button onClick={handleConfirmScannedCopy} className="w-1/2 bg-emerald-600 text-white px-4 py-3 rounded-lg font-bold hover:bg-emerald-700 transition-colors shadow-md">Confirm & Save</button>
+                </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {qrBook && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100 text-center flex flex-col">
+              <div className="bg-[#14291c] p-4 px-6 flex justify-between items-center">
+                <h3 className="font-serif font-bold text-lg text-white">Book QR Code</h3>
+                <button onClick={() => setQrBook(null)} className="text-emerald-200 hover:text-white text-xl leading-none">&times;</button>
+              </div>
+              
+              <div className="p-8 flex flex-col items-center justify-center bg-stone-50 border-b border-stone-100">
+                 <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-200 mb-4 inline-block">
+                   <QRCodeCanvas 
+                      id="qr-canvas" 
+                      value={`ISBN: ${qrBook.isbn}\nTitle: ${qrBook.title}\nAuthor: ${qrBook.author}`} 
+                      size={180} 
+                      level={"M"} 
+                   />
+                 </div>
+                 <h4 className="font-bold text-slate-900 text-lg leading-tight">{qrBook.title}</h4>
+                 <p className="text-xs text-slate-500 mt-1 font-mono">{qrBook.isbn}</p>
+              </div>
+
+              <div className="p-4 flex gap-3 bg-white">
+                <button onClick={() => setQrBook(null)} className="w-1/2 px-4 py-2.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors">Close</button>
+                <button onClick={handlePrintQRSticker} className="w-1/2 bg-purple-600 text-white px-4 py-2.5 rounded-lg font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2">
+                  <span>🖨️</span> Print Sticker
+                </button>
+              </div>
+           </div>
+        </div>
+      )}
 
       {editingBook && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -127,7 +323,7 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
             <form onSubmit={handleAddExtraCopies} className="p-6 text-center">
               <p className="text-sm text-slate-500 mb-4">Adding to: <span className="font-bold text-slate-900">{addingCopiesToBook.title}</span></p>
               <input type="number" min="1" required value={extraCopiesCount} onChange={(e) => setExtraCopiesCount(e.target.value)} className="w-full text-center text-2xl p-3 bg-stone-50 border border-stone-200 rounded-lg mb-6 outline-none focus:ring-2 focus:ring-[#14291c]" />
-              <div className="flex gap-3"><button type="button" onClick={() => setAddingCopiesToBook(null)} className="w-1/2 py-2.5 font-bold text-slate-500">Cancel</button><button type="submit" className="w-1/2 bg-[#14291c] text-white py-2.5 rounded-lg font-bold">Add Now</button></div>
+              <div className="flex gap-3"><button type="button" onClick={() => setAddingCopiesToBook(null)} className="w-1/2 py-2.5 font-bold text-slate-500 hover:bg-slate-100 rounded-lg">Cancel</button><button type="submit" className="w-1/2 bg-[#14291c] text-white py-2.5 rounded-lg font-bold hover:bg-[#0c1a11]">Add Now</button></div>
             </form>
           </div>
         </div>
