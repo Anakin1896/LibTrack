@@ -29,6 +29,9 @@ function AdminDashboard({ user }) {
 
   const [dashboardModal, setDashboardModal] = useState(null); 
 
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
   const fetchBooks = async () => {
     setIsLoadingBooks(true);
     try {
@@ -215,6 +218,33 @@ function AdminDashboard({ user }) {
     .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
     .slice(0, 5); 
 
+  const getSearchResults = () => {
+    if (!globalSearchQuery.trim()) return null;
+    const query = globalSearchQuery.toLowerCase();
+
+    const matchedBooks = books.filter(b => 
+      b.title.toLowerCase().includes(query) || 
+      b.author.toLowerCase().includes(query) || 
+      b.isbn.includes(query)
+    ).slice(0, 3);
+
+    const matchedMembers = members.filter(m => 
+      m.first_name.toLowerCase().includes(query) || 
+      m.last_name.toLowerCase().includes(query) || 
+      m.username.toLowerCase().includes(query)
+    ).slice(0, 3);
+
+    const matchedTx = transactions.filter(tx => {
+      const borrowerName = tx.user?.first_name ? `${tx.user.first_name} ${tx.user.last_name}` : (tx.user?.username || tx.member_id || '');
+      return tx.book_title.toLowerCase().includes(query) || borrowerName.toLowerCase().includes(query);
+    }).slice(0, 3);
+
+    return { books: matchedBooks, members: matchedMembers, transactions: matchedTx };
+  };
+
+  const searchResults = getSearchResults();
+  const hasResults = searchResults && (searchResults.books.length > 0 || searchResults.members.length > 0 || searchResults.transactions.length > 0);
+
   return (
     <div className="flex h-screen bg-[#F9F9F9] font-sans overflow-hidden relative">
       {notification && (
@@ -315,7 +345,7 @@ function AdminDashboard({ user }) {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden relative bg-[#F9F9F9]">
-        <header className="bg-[#F9F9F9] px-10 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 z-10 border-b border-stone-200">
+        <header className="bg-[#F9F9F9] px-10 py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 z-30 border-b border-stone-200">
           <div>
             <h1 className="text-3xl font-serif font-bold text-slate-900 mb-1">
               {activeTab === 'dashboard' && 'Dashboard'}
@@ -326,8 +356,82 @@ function AdminDashboard({ user }) {
             </h1>
             <p className="text-sm text-slate-500">Welcome back, {user?.first_name || user?.username} — {formattedToday}</p>
           </div>
-          <div className="flex items-center gap-4">
-             <div className="relative"><span className="absolute left-3 top-2 text-stone-400 text-sm">🔍</span><input type="text" placeholder="Search..." className="pl-9 pr-4 py-2 bg-white border border-stone-200 rounded-full text-sm outline-none focus:ring-2 focus:ring-[#14291c] w-64 shadow-sm" /></div>
+
+          <div className="flex items-center gap-4 relative">
+             <div className="relative">
+               <span className="absolute left-3 top-2 text-stone-400 text-sm">🔍</span>
+               <input 
+                 type="text" 
+                 placeholder="Search anything..." 
+                 className="pl-9 pr-4 py-2 bg-white border border-stone-200 rounded-full text-sm outline-none focus:ring-2 focus:ring-[#14291c] w-64 shadow-sm transition-all focus:w-80" 
+                 value={globalSearchQuery}
+                 onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                 onFocus={() => setIsSearchFocused(true)}
+                 onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+               />
+
+               {isSearchFocused && globalSearchQuery.trim() && (
+                 <div className="absolute top-12 right-0 w-96 bg-white rounded-xl shadow-2xl border border-stone-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                   {hasResults ? (
+                     <div className="max-h-96 overflow-y-auto">
+                       {searchResults.books.length > 0 && (
+                         <div className="p-2">
+                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 py-1">Books</p>
+                           {searchResults.books.map(book => (
+                             <button key={`search-book-${book.id}`} onClick={() => { setActiveTab('inventory'); setGlobalSearchQuery(''); }} className="w-full text-left px-3 py-2 hover:bg-stone-50 rounded-lg flex justify-between items-center group">
+                               <div>
+                                 <p className="text-sm font-bold text-slate-800 group-hover:text-[#14291c] truncate w-64">{book.title}</p>
+                                 <p className="text-[11px] text-slate-500">{book.author}</p>
+                               </div>
+                               <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${book.active_copies_count > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{book.active_copies_count > 0 ? 'Avail' : 'Out'}</span>
+                             </button>
+                           ))}
+                         </div>
+                       )}
+
+                       {searchResults.members.length > 0 && (
+                         <div className="p-2 border-t border-stone-100">
+                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 py-1">Members</p>
+                           {searchResults.members.map(member => (
+                             <button key={`search-member-${member.id}`} onClick={() => { setActiveTab('members'); setGlobalSearchQuery(''); }} className="w-full text-left px-3 py-2 hover:bg-stone-50 rounded-lg flex justify-between items-center group">
+                               <div className="flex items-center gap-2">
+                                 <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shrink-0">{member.first_name.charAt(0)}</div>
+                                 <div>
+                                   <p className="text-sm font-bold text-slate-800 group-hover:text-[#14291c]">{member.first_name} {member.last_name}</p>
+                                   <p className="text-[11px] text-slate-500 font-mono">{member.username}</p>
+                                 </div>
+                               </div>
+                               <span className="text-[10px] text-slate-400 uppercase">{member.role}</span>
+                             </button>
+                           ))}
+                         </div>
+                       )}
+
+                       {searchResults.transactions.length > 0 && (
+                         <div className="p-2 border-t border-stone-100">
+                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-3 py-1">Active Checkouts</p>
+                           {searchResults.transactions.map(tx => {
+                             const isOverdue = tx.due_date ? Math.ceil((new Date(tx.due_date).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24)) < 0 : false;
+                             return (
+                             <button key={`search-tx-${tx.id}`} onClick={() => { setActiveTab('transactions'); setGlobalSearchQuery(''); }} className="w-full text-left px-3 py-2 hover:bg-stone-50 rounded-lg flex justify-between items-center group">
+                               <div>
+                                 <p className="text-sm font-bold text-slate-800 group-hover:text-[#14291c] truncate w-56">{tx.book_title}</p>
+                                 <p className="text-[11px] text-slate-500">Borrowed by: {tx.user?.username || tx.member_id}</p>
+                               </div>
+                               <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isOverdue ? 'bg-red-100 text-red-800' : 'bg-stone-100 text-stone-600'}`}>{isOverdue ? 'Overdue' : tx.status}</span>
+                             </button>
+                           )})}
+                         </div>
+                       )}
+                     </div>
+                   ) : (
+                     <div className="p-8 text-center text-slate-500 text-sm">
+                       No matches found for "{globalSearchQuery}"
+                     </div>
+                   )}
+                 </div>
+               )}
+             </div>
           </div>
         </header>
 
