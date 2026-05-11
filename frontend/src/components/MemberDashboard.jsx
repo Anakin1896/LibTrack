@@ -1,13 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../api';
 
 function MemberDashboard({ user }) {
   const [activeTab, setActiveTab] = useState('catalog');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [books, setBooks] = useState([]);
+  const [myTransactions, setMyTransactions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const navigate = useNavigate(); 
-  
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  useEffect(() => {
+    const fetchMemberData = async () => {
+      setIsLoading(true);
+      try {
+        const [booksRes, txRes] = await Promise.all([
+          api.get('/catalog/books/'),
+          api.get('/transactions/')
+        ]);
+        
+        setBooks(booksRes.data);
+
+        const userTransactions = txRes.data.filter(tx => 
+          (tx.user && tx.user.id === user?.id) || 
+          (tx.member_id === user?.username) || 
+          (tx.member_id === user?.member_id)
+        );
+        setMyTransactions(userTransactions);
+      } catch (error) {
+        console.error("Error fetching member data", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchMemberData();
+    }
+  }, [user]);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -15,20 +48,14 @@ function MemberDashboard({ user }) {
     navigate('/login');
   };
 
-  const scaffoldCatalog = [
-    { id: 1, title: 'The Pragmatic Programmer', author: 'David Thomas', category: 'Computer Science', available: true },
-    { id: 2, title: 'Clean Code', author: 'Robert C. Martin', category: 'Computer Science', available: false },
-    { id: 3, title: 'Introduction to Algorithms', author: 'Thomas H. Cormen', category: 'Computer Science', available: true },
-    { id: 4, title: 'Dune', author: 'Frank Herbert', category: 'Fiction', available: true },
-    { id: 5, title: 'A Brief History of Time', author: 'Stephen Hawking', category: 'Science', available: true },
-    { id: 6, title: 'Design Patterns', author: 'Erich Gamma', category: 'Computer Science', available: false },
-  ];
-
-  const myBooks = [
-    { id: 1, title: 'Clean Code', borrowedOn: 'May 1, 2026', due: 'May 15, 2026', status: 'Active' }
-  ];
-
   const displayRole = user?.role === 'TEACHER' ? 'Faculty Member' : 'Student';
+  const activeTxCount = myTransactions.filter(tx => tx.status === 'ACTIVE' || tx.status === 'PENDING').length;
+  
+  const filteredBooks = books.filter(book => 
+    book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    book.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="flex h-screen bg-[#FDFCF8] font-sans overflow-hidden">
@@ -63,7 +90,9 @@ function MemberDashboard({ user }) {
             <div className="flex items-center gap-3">
               <span>📚</span> My Books
             </div>
-            <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">1</span>
+            {activeTxCount > 0 && (
+              <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{activeTxCount}</span>
+            )}
           </button>
         </nav>
 
@@ -109,40 +138,49 @@ function MemberDashboard({ user }) {
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
                   <button className="px-4 py-2 bg-[#1a3626] text-white text-xs font-bold rounded-lg whitespace-nowrap">All Books</button>
-                  <button className="px-4 py-2 bg-stone-100 text-slate-600 hover:bg-stone-200 text-xs font-bold rounded-lg whitespace-nowrap transition-colors">Computer Science</button>
-                  <button className="px-4 py-2 bg-stone-100 text-slate-600 hover:bg-stone-200 text-xs font-bold rounded-lg whitespace-nowrap transition-colors">Fiction</button>
+                  <button onClick={() => setSearchQuery('Computer Science')} className="px-4 py-2 bg-stone-100 text-slate-600 hover:bg-stone-200 text-xs font-bold rounded-lg whitespace-nowrap transition-colors">Computer Science</button>
+                  <button onClick={() => setSearchQuery('Fiction')} className="px-4 py-2 bg-stone-100 text-slate-600 hover:bg-stone-200 text-xs font-bold rounded-lg whitespace-nowrap transition-colors">Fiction</button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {scaffoldCatalog.map((book) => (
-                  <div key={book.id} className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group flex flex-col">
-                    <div className="h-48 bg-stone-100 flex items-center justify-center p-6 border-b border-stone-100 relative">
-                      <div className="w-24 h-32 bg-[#1a3626] rounded shadow-md border-l-4 border-yellow-600 flex items-center justify-center text-center p-2">
-                         <span className="text-white/80 font-serif text-xs font-bold leading-tight line-clamp-3">{book.title}</span>
-                      </div>
+              {isLoading ? (
+                <div className="text-center py-12 text-slate-500">Loading catalog...</div>
+              ) : filteredBooks.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">No books found matching your search.</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {filteredBooks.map((book) => {
+                    const isAvailable = book.available_copies_count > 0;
+                    return (
+                      <div key={book.id} className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group flex flex-col">
+                        <div className="h-48 bg-stone-100 flex items-center justify-center p-6 border-b border-stone-100 relative">
+                          <div className="w-24 h-32 bg-[#1a3626] rounded shadow-md border-l-4 border-yellow-600 flex items-center justify-center text-center p-2">
+                            <span className="text-white/80 font-serif text-xs font-bold leading-tight line-clamp-3">{book.title}</span>
+                          </div>
 
-                      <div className="absolute top-3 right-3">
-                        {book.available ? (
-                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-200">Available</span>
-                        ) : (
-                          <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-1 rounded-full border border-rose-200">Borrowed</span>
-                        )}
-                      </div>
-                    </div>
+                          <div className="absolute top-3 right-3">
+                            {isAvailable ? (
+                              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-200">Available</span>
+                            ) : (
+                              <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-2 py-1 rounded-full border border-rose-200">Borrowed</span>
+                            )}
+                          </div>
+                        </div>
 
-                    <div className="p-5 flex flex-col flex-1">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">{book.category}</p>
-                      <h3 className="font-bold text-slate-900 leading-tight mb-1 line-clamp-2">{book.title}</h3>
-                      <p className="text-xs text-slate-500 mb-4">{book.author}</p>
-                      
-                      <button className="mt-auto w-full py-2 bg-stone-50 hover:bg-stone-100 text-[#1a3626] text-xs font-bold rounded-lg border border-stone-200 transition-colors">
-                        View Details
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                        <div className="p-5 flex flex-col flex-1">
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">{book.category}</p>
+                          <h3 className="font-bold text-slate-900 leading-tight mb-1 line-clamp-2">{book.title}</h3>
+                          <p className="text-xs text-slate-500 mb-4">{book.author}</p>
+                          
+                          <button className="mt-auto w-full py-2 bg-stone-50 hover:bg-stone-100 text-[#1a3626] text-xs font-bold rounded-lg border border-stone-200 transition-colors">
+                            View Details
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
             </div>
           )}
@@ -158,24 +196,36 @@ function MemberDashboard({ user }) {
                     <thead>
                       <tr className="bg-stone-50 text-xs text-slate-500 uppercase tracking-wider border-b border-stone-100">
                         <th className="p-4 pl-6 font-semibold">Book Title</th>
-                        <th className="p-4 font-semibold">Date Borrowed</th>
                         <th className="p-4 font-semibold">Due Date</th>
                         <th className="p-4 font-semibold">Status</th>
                       </tr>
                     </thead>
                     <tbody className="text-sm divide-y divide-stone-100 bg-white">
-                      {myBooks.map((book) => (
-                        <tr key={book.id} className="hover:bg-stone-50/50 transition-colors">
-                          <td className="p-4 pl-6 font-bold text-slate-900">{book.title}</td>
-                          <td className="p-4 text-slate-600">{book.borrowedOn}</td>
-                          <td className="p-4 font-semibold text-slate-900">{book.due}</td>
-                          <td className="p-4">
-                             <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
-                               {book.status}
-                             </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {isLoading ? (
+                         <tr><td colSpan="3" className="p-6 text-center text-slate-500">Loading your history...</td></tr>
+                      ) : myTransactions.length === 0 ? (
+                         <tr><td colSpan="3" className="p-6 text-center text-slate-500">You don't have any borrowed books right now.</td></tr>
+                      ) : (
+                        myTransactions.map((tx) => {
+                          const statusStyle = 
+                            tx.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
+                            tx.status === 'PENDING' ? 'bg-purple-100 text-purple-800' :
+                            tx.status === 'RETURNED' ? 'bg-stone-100 text-stone-500' :
+                            'bg-red-100 text-red-800';
+
+                          return (
+                            <tr key={tx.id} className="hover:bg-stone-50/50 transition-colors">
+                              <td className="p-4 pl-6 font-bold text-slate-900">{tx.book_title}</td>
+                              <td className="p-4 font-semibold text-slate-900">{new Date(tx.due_date).toLocaleDateString()}</td>
+                              <td className="p-4">
+                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider border border-stone-200/50 ${statusStyle}`}>
+                                  {tx.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>
