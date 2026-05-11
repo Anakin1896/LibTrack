@@ -1,4 +1,4 @@
-from rest_framework import generics, viewsets
+from rest_framework import generics, viewsets, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -8,6 +8,8 @@ from .models import User
 from django.contrib.auth import authenticate
 from .serializers import RegisterSerializer, UserSerializer
 from .serializers import CustomTokenObtainPairSerializer
+from .serializers import NotificationSerializer
+from .models import Notification
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -49,3 +51,11 @@ class ChangePasswordView(APIView):
             return Response({"message": "Password updated successfully"}, status=status.HTTP_200_OK)
         else:
             return Response({"error": "Invalid current password."}, status=status.HTTP_400_BAD_REQUEST)
+        
+class NotificationViewSet(viewsets.ModelViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        
+        return Notification.objects.filter(user=self.request.user).order_by('-created_at')

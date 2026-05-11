@@ -1,7 +1,9 @@
 from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from catalog.models import BookCopy
+from users.models import Notification
 from .models import Transaction
 from .serializers import TransactionSerializer
 
@@ -63,3 +65,20 @@ class TransactionViewSet(viewsets.ModelViewSet):
         elif instance.status == 'LOST':
             copy.status = 'LOST'
             copy.save()
+
+    @action(detail=True, methods=['post'])
+    def remind(self, request, pk=None):
+        transaction = self.get_object()
+
+        if not transaction.user:
+            return Response({"detail": "Cannot send reminder: No registered user linked to this transaction."}, status=status.HTTP_400_BAD_REQUEST)
+
+        formatted_date = transaction.due_date.strftime('%B %d, %Y')
+        book_title = transaction.book_copy.book.title
+
+        Notification.objects.create(
+            user=transaction.user,
+            message=f"Library Reminder: Your borrowed copy of '{book_title}' is due on {formatted_date}. Please return it to avoid penalties."
+        )
+
+        return Response({"status": "Reminder notification created successfully!"}, status=status.HTTP_200_OK)

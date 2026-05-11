@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5QrcodeScanner } from 'html5-qrcode'; 
 
 function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks, showNotification }) {
 
@@ -20,13 +20,12 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
 
       scanner.render(
         (decodedText) => {
-
           scanner.clear();
           setIsScanning(false);
-
+          
           const isbnMatch = decodedText.match(/ISBN:\s*([^\n]+)/);
           const scannedIsbn = isbnMatch ? isbnMatch[1].trim() : decodedText.trim();
-
+          
           setNewTx(prev => ({ ...prev, isbn: scannedIsbn }));
           showNotification("Book scanned successfully!", "success");
         },
@@ -37,7 +36,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
         scanner.clear().catch(error => console.error("Failed to clear scanner", error));
       };
     }
-  }, [isScanning]);
+  }, [isScanning]); 
 
   const handleIssueBook = async (e) => {
     e.preventDefault();
@@ -83,6 +82,18 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
     } catch (error) { showNotification("Error cancelling reservation.", "error"); }
   };
 
+  const handleSendReminder = async (tx) => {
+    try {
+
+      await api.post(`/transactions/${tx.id}/remind/`);
+  
+      const borrowerName = tx.user?.first_name || tx.member_id || 'Student';
+      showNotification(`Reminder sent to ${borrowerName}!`, "success");
+    } catch (error) { 
+      showNotification("Error sending reminder.", "error"); 
+    }
+  };
+
   const getTxStatus = (tx) => {
     if (tx.status === 'LOST') return { text: 'Lost', style: 'bg-slate-800 text-white border-slate-900' };
     if (tx.status === 'CANCELLED') return { text: 'Cancelled', style: 'bg-stone-100 text-stone-500 border-stone-200' };
@@ -121,7 +132,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Student/Member ID</label>
               <input required value={newTx.member_id} onChange={(e) => setNewTx({...newTx, member_id: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="Enter ID..." />
             </div>
-
+            
             <div>
               <div className="flex justify-between items-end mb-2">
                 <label className="block text-xs font-bold text-slate-500 uppercase">Book ISBN</label>
@@ -183,7 +194,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                        <tr key={tx.id} className={`hover:bg-stone-50/50 ${tx.status === 'RETURNED' || tx.status === 'LOST' || tx.status === 'CANCELLED' ? 'opacity-60' : ''}`}>
                          <td className="p-4 pl-6 font-bold">{tx.user?.username || tx.member_id || "Unknown"}</td>
                          <td className="p-4 text-slate-600">{borrowerName}</td>
-                         <td className="p-4">{tx.book_title}</td>
+                         <td className="p-4 max-w-50 truncate" title={tx.book_title}>{tx.book_title}</td>
                          <td className="p-4">{new Date(tx.due_date).toLocaleDateString()}</td>
                          <td className="p-4"><span className={`text-[10px] uppercase px-2 py-1 rounded-full font-bold border whitespace-nowrap ${status.style}`}>{status.text}</span></td>
                          <td className="p-4 text-right pr-6">
@@ -195,6 +206,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                              </div>
                            ) : tx.status === 'ACTIVE' ? (
                              <div className="flex items-center justify-end gap-3">
+                               <button onClick={() => handleSendReminder(tx)} className="text-blue-500 hover:text-blue-700 text-xs font-bold">Remind</button>
                                <button onClick={() => setTransactionToMarkLost(tx)} className="text-red-500 hover:text-red-700 text-xs font-bold">Lost?</button>
                                <button onClick={() => handleReturnBook(tx.id)} className="bg-stone-100 px-4 py-2 rounded-lg text-xs font-bold text-[#14291c] hover:bg-emerald-100 hover:text-emerald-800 border border-stone-200 transition-colors">Return</button>
                              </div>
@@ -222,7 +234,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
               </div>
               <div className="p-6 bg-stone-50">
                  <p className="text-sm text-slate-500 mb-4">Position the book's QR code inside the frame to automatically extract the ISBN.</p>
-                 <div id="qr-reader-tx" className="mx-auto overflow-hidden rounded-xl border-2 border-indigo-200 bg-black"></div>
+                 <div id="qr-reader-tx" className="mx-auto overflow-hidden rounded-xl border-2 border-indigo-200 bg-white min-h-62.5"></div>
               </div>
               <div className="p-4 bg-white border-t border-stone-100">
                 <button onClick={() => setIsScanning(false)} className="w-full px-4 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors border border-stone-200">Cancel Scanning</button>

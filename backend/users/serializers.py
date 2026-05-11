@@ -1,9 +1,10 @@
 import re
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password as django_validate_password
-from .models import User, StudentProfile, TeacherProfile
+from .models import Notification, User, StudentProfile, TeacherProfile
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.exceptions import PermissionDenied
+
 
 class StudentProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -88,3 +89,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             raise PermissionDenied(detail="password_change_required")
             
         return data
+    
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'message', 'is_read', 'created_at']
