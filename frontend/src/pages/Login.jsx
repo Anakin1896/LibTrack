@@ -217,7 +217,7 @@ function Login() {
               </label>
               <input 
                 type="text" 
-                placeholder="e.g. 2023-12345 or EMP-001"
+                placeholder="e.g. 2026-00001 or EMP-001"
                 value={userId}
                 onChange={(e) => setUserId(e.target.value)}
                 className="w-full px-4 py-3 bg-stone-100 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1a3626] transition-all"

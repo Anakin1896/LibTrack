@@ -2,6 +2,9 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
+from django.utils import timezone        
+from datetime import timedelta           
+
 from catalog.models import BookCopy
 from users.models import Notification
 from .models import Transaction
@@ -27,7 +30,6 @@ class TransactionViewSet(viewsets.ModelViewSet):
             due_date = request.data.get('due_date')
 
             try:
- 
                 student = User.objects.get(username=member_id)
                 book_copy = BookCopy.objects.filter(book__isbn=isbn, status='AVAILABLE').first()
                 
@@ -50,7 +52,31 @@ class TransactionViewSet(viewsets.ModelViewSet):
             except User.DoesNotExist:
                 return Response({"detail": "Student/Teacher ID not found in database."}, status=status.HTTP_400_BAD_REQUEST)
 
-        return super().create(request, *args, **kwargs)
+        else:
+            isbn = request.data.get('isbn')
+            
+            if not isbn:
+                return Response({"detail": "ISBN is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            book_copy = BookCopy.objects.filter(book__isbn=isbn, status='AVAILABLE').first()
+            
+            if not book_copy:
+                return Response({"detail": "Sorry, no copies are currently available."}, status=status.HTTP_400_BAD_REQUEST)
+
+            default_due_date = timezone.now() + timedelta(days=7)
+
+            transaction = Transaction.objects.create(
+                user=request.user,
+                book_copy=book_copy,
+                status='PENDING',
+                due_date=default_due_date
+            )
+
+            book_copy.status = 'BORROWED' 
+            book_copy.save()
+
+            serializer = self.get_serializer(transaction)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
@@ -58,8 +84,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         instance = serializer.save()
         copy = instance.book_copy
-        
-        if instance.status == 'RETURNED':
+
+        if instance.status in ['RETURNED', 'CANCELLED']:
             copy.status = 'AVAILABLE'
             copy.save()
         elif instance.status == 'LOST':

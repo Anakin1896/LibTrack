@@ -17,7 +17,6 @@ function MemberDashboard({ user }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const notifRef = useRef(null);
-
   const navigate = useNavigate(); 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -27,57 +26,56 @@ function MemberDashboard({ user }) {
         setShowNotifications(false);
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside);
-
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [notifRef]);
 
-  useEffect(() => {
-    const fetchMemberData = async () => {
-      setIsLoading(true);
+  const fetchMemberData = async () => {
+    setIsLoading(true);
+    
+    try {
+      try {
+        const booksRes = await api.get('/catalog/books/');
+        setBooks(Array.isArray(booksRes.data.results) ? booksRes.data.results : booksRes.data);
+      } catch (bookErr) {
+        console.error("Failed to load books:", bookErr);
+        setBooks([]);
+      }
+
+      try {
+        const txRes = await api.get('/transactions/');
+        const allTx = Array.isArray(txRes.data.results) ? txRes.data.results : txRes.data;
+        const userTransactions = allTx.filter(tx => 
+          (tx.user && tx.user.id === user?.id) || 
+          (tx.member_id === user?.username) || 
+          (tx.member_id === user?.member_id)
+        );
+        setMyTransactions(userTransactions);
+      } catch (txErr) {
+        console.error("Failed to load transactions:", txErr);
+        setMyTransactions([]);
+      }
       
       try {
-        try {
-          const booksRes = await api.get('/catalog/books/');
-          setBooks(Array.isArray(booksRes.data.results) ? booksRes.data.results : booksRes.data);
-        } catch (bookErr) {
-          console.error("Failed to load books:", bookErr);
-          setBooks([]);
-        }
-
-        try {
-          const txRes = await api.get('/transactions/');
-          const allTx = Array.isArray(txRes.data.results) ? txRes.data.results : txRes.data;
-          const userTransactions = allTx.filter(tx => 
-            (tx.user && tx.user.id === user?.id) || 
-            (tx.member_id === user?.username) || 
-            (tx.member_id === user?.member_id)
-          );
-          setMyTransactions(userTransactions);
-        } catch (txErr) {
-          console.error("Failed to load transactions:", txErr);
-          setMyTransactions([]);
-        }
-        
-        try {
-          const notifRes = await api.get('/users/notifications/');
-          setNotifications(Array.isArray(notifRes.data.results) ? notifRes.data.results : notifRes.data);
-        } catch (notifErr) {
-          console.warn("Notifications not ready yet:", notifErr);
-          setNotifications([]); 
-        }
-        
-      } finally {
-        setIsLoading(false);
+        const notifRes = await api.get('/users/notifications/');
+        setNotifications(Array.isArray(notifRes.data.results) ? notifRes.data.results : notifRes.data);
+      } catch (notifErr) {
+        console.warn("Notifications not ready yet:", notifErr);
+        setNotifications([]); 
       }
-    };
+      
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (user) {
       fetchMemberData();
     }
+
   }, [user]);
 
   const handleLogout = () => {
@@ -98,10 +96,17 @@ function MemberDashboard({ user }) {
   const handleReserveBook = async () => {
     if (!selectedBook) return;
     try {
-      alert(`Reservation request sent for: ${selectedBook.title}. Please pick it up at the library desk within 24 hours.`);
+
+      await api.post('/transactions/', { isbn: selectedBook.isbn });
+      
+      alert(`Reservation successful! "${selectedBook.title}" is now pending. Please visit the library desk to pick it up.`);
       setSelectedBook(null);
+
+      fetchMemberData(); 
+      setActiveTab('mybooks');
+      
     } catch (error) {
-      alert("Error reserving book.");
+      alert(error.response?.data?.detail || "Error reserving book.");
     }
   };
 
@@ -159,7 +164,7 @@ function MemberDashboard({ user }) {
             </h1>
             <p className="text-sm text-slate-500 mt-1">Welcome back, {user?.first_name || 'Member'} — {today}</p>
           </div>
-
+          
           <div className="relative" ref={notifRef}>
             <button onClick={() => setShowNotifications(!showNotifications)} className="p-3 bg-stone-50 hover:bg-stone-100 rounded-full border border-stone-200 transition-colors relative">
               <span className="text-lg">🔔</span>
