@@ -284,7 +284,7 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
               </div>
               <div className="p-6 bg-stone-50">
                  <p className="text-sm text-slate-500 mb-4">Position the book's QR code inside the frame to automatically add copies to the inventory.</p>
-                 <div id="qr-reader" className="mx-auto overflow-hidden rounded-xl border-2 border-indigo-200 bg-white min-h-[250px]"></div>
+                 <div id="qr-reader" className="mx-auto overflow-hidden rounded-xl border-2 border-indigo-200 bg-white min-h-62.5"></div>
               </div>
               <div className="p-4 bg-white border-t border-stone-100">
                 <button onClick={() => setIsScanning(false)} className="w-full px-4 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors border border-stone-200">Cancel Scanning</button>
