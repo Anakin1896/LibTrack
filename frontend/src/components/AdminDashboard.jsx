@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
-
 import ProfileTab from './Profile';
 import InventoryTab from './Inventory';
 import TransactionsTab from './Transactions';
@@ -27,8 +26,7 @@ function AdminDashboard({ user }) {
   const [members, setMembers] = useState([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
 
-  const [dashboardModal, setDashboardModal] = useState(null); 
-
+  const [dashboardModal, setDashboardModal] = useState(null);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
@@ -37,23 +35,35 @@ function AdminDashboard({ user }) {
     try {
       const response = await api.get('/catalog/books/');
       setBooks(Array.isArray(response.data.results ? response.data.results : response.data) ? (response.data.results ? response.data.results : response.data) : []);
-    } catch (error) { setBooks([]); } finally { setIsLoadingBooks(false); }
+    } catch (error) { 
+      setBooks([]);
+    } finally { 
+      setIsLoadingBooks(false); 
+    }
   };
 
   const fetchTransactions = async () => {
     setIsLoadingTx(true);
     try {
-      const response = await api.get('/transactions/'); 
+      const response = await api.get('/transactions/');
       setTransactions(Array.isArray(response.data.results ? response.data.results : response.data) ? (response.data.results ? response.data.results : response.data) : []);
-    } catch (error) { setTransactions([]); } finally { setIsLoadingTx(false); }
+    } catch (error) { 
+      setTransactions([]);
+    } finally { 
+      setIsLoadingTx(false); 
+    }
   };
 
   const fetchMembers = async () => {
     setIsLoadingMembers(true);
     try {
-      const response = await api.get('/users/'); 
+      const response = await api.get('/users/');
       setMembers(Array.isArray(response.data.results ? response.data.results : response.data) ? (response.data.results ? response.data.results : response.data) : []);
-    } catch (error) { setMembers([]); } finally { setIsLoadingMembers(false); }
+    } catch (error) { 
+      setMembers([]);
+    } finally { 
+      setIsLoadingMembers(false); 
+    }
   };
 
   useEffect(() => {
@@ -71,7 +81,6 @@ function AdminDashboard({ user }) {
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
-
     iframe.contentDocument.write(`
       <html>
         <head>
@@ -132,7 +141,6 @@ function AdminDashboard({ user }) {
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
-
     iframe.contentDocument.write(`
       <html>
         <head>
@@ -190,8 +198,9 @@ function AdminDashboard({ user }) {
 
   const totalBooksCount = books.reduce((sum, book) => sum + (book.active_copies_count ?? (book.copies?.length || 0)), 0);
   const activeCheckouts = transactions.filter(tx => tx.status === 'ACTIVE');
-  const activeMembersCount = members.length;
+  const pendingRequests = transactions.filter(tx => tx.status === 'PENDING');
   
+  const activeMembersCount = members.length;
   const overdueBooks = activeCheckouts.filter(tx => {
     const diffDays = Math.ceil((new Date(tx.due_date).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
     return diffDays < 0;
@@ -199,6 +208,7 @@ function AdminDashboard({ user }) {
   const lostBooks = transactions.filter(tx => tx.status === 'LOST');
   const attentionCount = overdueBooks.length + lostBooks.length;
 
+  const totalActionItems = pendingRequests.length + overdueBooks.length;
   const recentBooks = [...books].reverse().slice(0, 4);
   const recentTx = [...transactions].reverse().slice(0, 5);
 
@@ -216,29 +226,25 @@ function AdminDashboard({ user }) {
       return diffDays <= 3; 
     })
     .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
-    .slice(0, 5); 
+    .slice(0, 5);
 
   const getSearchResults = () => {
     if (!globalSearchQuery.trim()) return null;
     const query = globalSearchQuery.toLowerCase();
-
     const matchedBooks = books.filter(b => 
       b.title.toLowerCase().includes(query) || 
       b.author.toLowerCase().includes(query) || 
       b.isbn.includes(query)
     ).slice(0, 3);
-
     const matchedMembers = members.filter(m => 
       m.first_name.toLowerCase().includes(query) || 
       m.last_name.toLowerCase().includes(query) || 
       m.username.toLowerCase().includes(query)
     ).slice(0, 3);
-
     const matchedTx = transactions.filter(tx => {
       const borrowerName = tx.user?.first_name ? `${tx.user.first_name} ${tx.user.last_name}` : (tx.user?.username || tx.member_id || '');
       return tx.book_title.toLowerCase().includes(query) || borrowerName.toLowerCase().includes(query);
     }).slice(0, 3);
-
     return { books: matchedBooks, members: matchedMembers, transactions: matchedTx };
   };
 
@@ -327,9 +333,14 @@ function AdminDashboard({ user }) {
           
           <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest ml-4 mt-6 mb-3">Library</p>
           <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm font-medium ${activeTab === 'inventory' ? 'bg-[#e6a83a] text-[#14291c] font-bold shadow-md' : 'text-emerald-100/70 hover:bg-emerald-800/40 hover:text-white'}`}><span>📚</span> Add / View Books</button>
+
           <button onClick={() => setActiveTab('transactions')} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all text-sm font-medium ${activeTab === 'transactions' ? 'bg-[#e6a83a] text-[#14291c] font-bold shadow-md' : 'text-emerald-100/70 hover:bg-emerald-800/40 hover:text-white'}`}>
-            <div className="flex items-center gap-3"><span>🔄</span> Borrowed / Pending</div>
-            {activeCheckouts.length > 0 && <span className="bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">{activeCheckouts.length}</span>}
+            <div className="flex items-center gap-3"><span>🔄</span> Issue Book</div>
+            {totalActionItems > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 min-w-5 flex items-center justify-center rounded-full shadow-sm animate-pulse">
+                {totalActionItems}
+              </span>
+            )}
           </button>
 
           <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest ml-4 mt-6 mb-3">System</p>
@@ -440,7 +451,8 @@ function AdminDashboard({ user }) {
           {activeTab === 'profile' && <ProfileTab user={user} showNotification={showNotification} />}
           {activeTab === 'members' && <MembersTab members={members} isLoadingMembers={isLoadingMembers} fetchMembers={fetchMembers} showNotification={showNotification} />}
           {activeTab === 'inventory' && <InventoryTab books={books} isLoadingBooks={isLoadingBooks} fetchBooks={fetchBooks} showNotification={showNotification} />}
-          {activeTab === 'transactions' && <TransactionsTab transactions={transactions} isLoadingTx={isLoadingTx} fetchTransactions={fetchTransactions} fetchBooks={fetchBooks} showNotification={showNotification} />}
+          {activeTab === 'transactions' && <TransactionsTab transactions={transactions} isLoadingTx={isLoadingTx} fetchTransactions={fetchTransactions} fetchBooks={fetchBooks} showNotification={showNotification} books={books} members={members} />}
+          
           {activeTab === 'dashboard' && (
              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -467,7 +479,7 @@ function AdminDashboard({ user }) {
 
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                  <div className="lg:col-span-2 space-y-8">
-                    <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
+                     <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
                       <div className="flex justify-between items-center mb-6">
                         <h3 className="font-serif font-bold text-lg text-slate-900">Recently Added Books</h3>
                         <button onClick={() => setActiveTab('inventory')} className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg hover:bg-slate-100 hover:text-slate-700 transition-colors">View all →</button>
@@ -505,6 +517,7 @@ function AdminDashboard({ user }) {
                              const borrowerName = tx.user?.first_name ? `${tx.user.first_name} ${tx.user.last_name}` : (tx.user?.username || tx.member_id || 'Unknown');
                              const initials = borrowerName.substring(0, 2).toUpperCase();
                              const dueInfo = getDueStatus(tx.due_date);
+  
                              return (
                                <div key={tx.id} className="flex items-center justify-between p-3 hover:bg-stone-50 rounded-xl transition-colors border border-transparent hover:border-stone-100">
                                  <div className="flex items-center gap-4">
@@ -552,7 +565,7 @@ function AdminDashboard({ user }) {
                                       <p className="text-sm text-slate-700"><span className="font-bold">{borrowerName}</span> {actionText} <span className="font-bold">{tx.book_title}</span></p>
                                       <p className="text-[10px] text-slate-400 mt-0.5">{new Date(tx.reservation_date || tx.due_date).toLocaleDateString()}</p>
                                     </div>
-                                 </div>
+                                  </div>
                                )
                             })
                          )}
@@ -593,7 +606,7 @@ function AdminDashboard({ user }) {
 
                  </div>
                </div>
-             </div>
+            </div>
           )}
         </div>
       </main>

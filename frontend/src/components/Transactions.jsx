@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
-import { Html5QrcodeScanner } from 'html5-qrcode'; 
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
-function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks, showNotification }) {
+function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks, showNotification, books = [], members = [] }) {
 
-  const [txFilter, setTxFilter] = useState('active'); 
+  const [txFilter, setTxFilter] = useState('active');
   const [newTx, setNewTx] = useState({ member_id: '', isbn: '', due_date: '' });
   const [transactionToMarkLost, setTransactionToMarkLost] = useState(null);
-
   const [isScanning, setIsScanning] = useState(false);
+
+  const [bookSearchQuery, setBookSearchQuery] = useState('');
+  const [isSuggesting, setIsSuggesting] = useState(false);
+
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+  const [isSuggestingMember, setIsSuggestingMember] = useState(false);
 
   useEffect(() => {
     if (isScanning) {
@@ -27,6 +32,14 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
           const scannedIsbn = isbnMatch ? isbnMatch[1].trim() : decodedText.trim();
           
           setNewTx(prev => ({ ...prev, isbn: scannedIsbn }));
+          
+          const foundBook = books.find(b => b.isbn === scannedIsbn);
+          if (foundBook) {
+            setBookSearchQuery(foundBook.title);
+          } else {
+            setBookSearchQuery(scannedIsbn);
+          }
+
           showNotification("Book scanned successfully!", "success");
         },
         (error) => {}
@@ -36,7 +49,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
         scanner.clear().catch(error => console.error("Failed to clear scanner", error));
       };
     }
-  }, [isScanning]); 
+  }, [isScanning, books]);
 
   const handleIssueBook = async (e) => {
     e.preventDefault();
@@ -44,8 +57,13 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
       await api.post('/transactions/', newTx);
       showNotification("Book successfully issued!", "success");
       setNewTx({ member_id: '', isbn: '', due_date: '' }); 
-      fetchTransactions(); fetchBooks();
-    } catch (error) { showNotification(error.response?.data?.detail || "Error issuing book.", "error"); }
+      setBookSearchQuery(''); 
+      setMemberSearchQuery('');
+      fetchTransactions(); 
+      fetchBooks();
+    } catch (error) { 
+      showNotification(error.response?.data?.detail || "Error issuing book.", "error");
+    }
   };
 
   const handleReturnBook = async (transactionId) => {
@@ -84,9 +102,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
 
   const handleSendReminder = async (tx) => {
     try {
-
       await api.post(`/transactions/${tx.id}/remind/`);
-  
       const borrowerName = tx.user?.first_name || tx.member_id || 'Student';
       showNotification(`Reminder sent to ${borrowerName}!`, "success");
     } catch (error) { 
@@ -98,7 +114,6 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
     if (tx.status === 'LOST') return { text: 'Lost', style: 'bg-slate-800 text-white border-slate-900' };
     if (tx.status === 'CANCELLED') return { text: 'Cancelled', style: 'bg-stone-100 text-stone-500 border-stone-200' };
     if (tx.status === 'PENDING') return { text: 'Pending', style: 'bg-purple-100 text-purple-800 border-purple-200' };
-    
     if (tx.status === 'RETURNED') {
       if (tx.return_date && new Date(tx.return_date).setHours(0,0,0,0) > new Date(tx.due_date).setHours(0,0,0,0)) {
          return { text: 'Returned Late', style: 'bg-yellow-100 text-yellow-800 border-yellow-300' };
@@ -107,20 +122,28 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
     }
 
     const diffDays = Math.ceil((new Date(tx.due_date).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
-    
     if (diffDays < 0) return { text: 'Overdue', style: 'bg-red-100 text-red-800 border-red-200' };
     if (diffDays <= 3) return { text: 'Due Soon', style: 'bg-orange-100 text-orange-800 border-orange-200' };
-    
     return { text: 'Active', style: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
   };
 
   const pendingCount = transactions.filter(tx => tx.status === 'PENDING').length;
-
   const displayedTransactions = transactions.filter(tx => {
     if (txFilter === 'active') return tx.status === 'ACTIVE';
     if (txFilter === 'pending') return tx.status === 'PENDING';
     return true; 
   });
+
+  const bookSuggestions = bookSearchQuery.trim() === '' 
+    ? [] 
+    : books.filter(b => b.title.toLowerCase().includes(bookSearchQuery.toLowerCase()) || b.isbn.includes(bookSearchQuery)).slice(0, 5);
+
+  const memberSuggestions = memberSearchQuery.trim() === '' 
+    ? [] 
+    : members.filter(m => 
+        `${m.first_name} ${m.last_name}`.toLowerCase().includes(memberSearchQuery.toLowerCase()) || 
+        m.username.toLowerCase().includes(memberSearchQuery.toLowerCase())
+      ).slice(0, 5);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
@@ -129,18 +152,87 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
           <div className="bg-[#14291c] p-4 border-b border-emerald-800"><h3 className="font-serif font-bold text-lg text-white">Issue Book</h3></div>
           <form onSubmit={handleIssueBook} className="p-6 space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Student/Member ID</label>
-              <input required value={newTx.member_id} onChange={(e) => setNewTx({...newTx, member_id: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="Enter ID..." />
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Student/Member Name</label>
+              <div className="relative">
+                <input 
+                  required 
+                  value={memberSearchQuery} 
+                  onChange={(e) => {
+                     setMemberSearchQuery(e.target.value);
+                     setNewTx({...newTx, member_id: e.target.value}); 
+                     setIsSuggestingMember(true);
+                  }} 
+                  onFocus={() => setIsSuggestingMember(true)}
+                  onBlur={() => setTimeout(() => setIsSuggestingMember(false), 200)}
+                  className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" 
+                  placeholder="Search name or ID..." 
+                  autoComplete="off"
+                />
+                
+                {isSuggestingMember && memberSuggestions.length > 0 && (
+                   <div className="absolute z-10 w-full mt-1 bg-white border border-stone-200 rounded-lg shadow-xl overflow-hidden">
+                      {memberSuggestions.map(member => (
+                         <div 
+                           key={member.id} 
+                           className="p-3 hover:bg-stone-50 cursor-pointer border-b border-stone-100 last:border-0 transition-colors"
+                           onClick={() => {
+                              setNewTx({ ...newTx, member_id: member.username }); 
+                              setMemberSearchQuery(`${member.first_name} ${member.last_name}`);
+                              setIsSuggestingMember(false);
+                           }}
+                         >
+                           <p className="font-bold text-sm text-slate-800 truncate">{member.first_name} {member.last_name}</p>
+                           <p className="text-[10px] font-mono text-slate-400 mt-0.5">ID: {member.username}</p>
+                         </div>
+                      ))}
+                   </div>
+                )}
+              </div>
             </div>
             
             <div>
               <div className="flex justify-between items-end mb-2">
-                <label className="block text-xs font-bold text-slate-500 uppercase">Book ISBN</label>
-                <button type="button" onClick={() => setIsScanning(true)} className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-bold hover:bg-indigo-100 flex items-center gap-1 border border-indigo-100 transition-colors">
-                  <span>📷</span> Scan QR
-                </button>
+                 <label className="block text-xs font-bold text-slate-500 uppercase">Book Title</label>
+                 <button type="button" onClick={() => setIsScanning(true)} className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-bold hover:bg-indigo-100 flex items-center gap-1 border border-indigo-100 transition-colors">
+                   <span>📷</span> Scan QR
+                 </button>
               </div>
-              <input required value={newTx.isbn} onChange={(e) => setNewTx({...newTx, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" placeholder="Scan or type ISBN..." />
+              
+              <div className="relative">
+                <input 
+                  required 
+                  value={bookSearchQuery} 
+                  onChange={(e) => {
+                     setBookSearchQuery(e.target.value);
+                     setNewTx({...newTx, isbn: e.target.value}); 
+                     setIsSuggesting(true);
+                  }} 
+                  onFocus={() => setIsSuggesting(true)}
+                  onBlur={() => setTimeout(() => setIsSuggesting(false), 200)}
+                  className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" 
+                  placeholder="Scan QR or type title..." 
+                  autoComplete="off"
+                />
+                
+                {isSuggesting && bookSuggestions.length > 0 && (
+                   <div className="absolute z-10 w-full mt-1 bg-white border border-stone-200 rounded-lg shadow-xl overflow-hidden">
+                      {bookSuggestions.map(book => (
+                         <div 
+                           key={book.id} 
+                           className="p-3 hover:bg-stone-50 cursor-pointer border-b border-stone-100 last:border-0 transition-colors"
+                           onClick={() => {
+                              setNewTx({ ...newTx, isbn: book.isbn });
+                              setBookSearchQuery(book.title); 
+                              setIsSuggesting(false);
+                           }}
+                         >
+                           <p className="font-bold text-sm text-slate-800 truncate">{book.title}</p>
+                           <p className="text-[10px] font-mono text-slate-400 mt-0.5">ISBN: {book.isbn}</p>
+                         </div>
+                      ))}
+                   </div>
+                )}
+              </div>
             </div>
 
             <div>
@@ -191,7 +283,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                        : '-';
 
                      return (
-                       <tr key={tx.id} className={`hover:bg-stone-50/50 ${tx.status === 'RETURNED' || tx.status === 'LOST' || tx.status === 'CANCELLED' ? 'opacity-60' : ''}`}>
+                      <tr key={tx.id} className={`hover:bg-stone-50/50 ${tx.status === 'RETURNED' || tx.status === 'LOST' || tx.status === 'CANCELLED' ? 'opacity-60' : ''}`}>
                          <td className="p-4 pl-6 font-bold">{tx.user?.username || tx.member_id || "Unknown"}</td>
                          <td className="p-4 text-slate-600">{borrowerName}</td>
                          <td className="p-4 max-w-50 truncate" title={tx.book_title}>{tx.book_title}</td>

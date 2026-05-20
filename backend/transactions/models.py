@@ -24,6 +24,7 @@ class Transaction(models.Model):
     activation_date = models.DateTimeField(null=True, blank=True)
     due_date = models.DateTimeField(default=get_default_due_date)
     return_date = models.DateTimeField(null=True, blank=True)
+    expected_pickup_date = models.DateField(null=True, blank=True)
     
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='RESERVED')
 

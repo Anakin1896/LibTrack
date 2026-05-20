@@ -13,12 +13,28 @@ function MemberDashboard({ user }) {
   const [showNotifications, setShowNotifications] = useState(false);
   
   const [selectedBook, setSelectedBook] = useState(null);
-  
+  const [reservationStatus, setReservationStatus] = useState(null); 
   const [isLoading, setIsLoading] = useState(true);
+
+  const [pickupDate, setPickupDate] = useState('');
 
   const notifRef = useRef(null);
   const navigate = useNavigate(); 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  const getFormattedDate = (dateObj) => {
+    return dateObj.toISOString().split('T')[0];
+  };
+  const minDateStr = getFormattedDate(new Date());
+  const maxDateObj = new Date();
+  maxDateObj.setDate(maxDateObj.getDate() + 3);
+  const maxDateStr = getFormattedDate(maxDateObj);
+
+  useEffect(() => {
+    if (selectedBook) {
+      setPickupDate(minDateStr);
+    }
+  }, [selectedBook, minDateStr]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -75,7 +91,6 @@ function MemberDashboard({ user }) {
     if (user) {
       fetchMemberData();
     }
-
   }, [user]);
 
   const handleLogout = () => {
@@ -93,20 +108,43 @@ function MemberDashboard({ user }) {
     }
   };
 
+  const handleCancelReservation = async (transactionId) => {
+    if (!window.confirm("Are you sure you want to cancel this reservation?")) return;
+    
+    try {
+      await api.post(`/transactions/${transactionId}/cancel_reservation/`);
+      alert("Reservation cancelled successfully.");
+      fetchMemberData();
+    } catch (error) {
+      alert(error.response?.data?.detail || "Error cancelling reservation.");
+    }
+  };
+
   const handleReserveBook = async () => {
     if (!selectedBook) return;
+
+    if (!pickupDate) {
+      alert("Please select a pickup date.");
+      return;
+    }
+
     try {
 
-      await api.post('/transactions/', { isbn: selectedBook.isbn });
+      await api.post('/transactions/', { 
+        isbn: selectedBook.isbn,
+        expected_pickup_date: pickupDate 
+      });
       
-      alert(`Reservation successful! "${selectedBook.title}" is now pending. Please visit the library desk to pick it up.`);
+      const reservedTitle = selectedBook.title;
       setSelectedBook(null);
-
-      fetchMemberData(); 
-      setActiveTab('mybooks');
+      fetchMemberData();
+      setReservationStatus({ type: 'success', title: reservedTitle });
       
     } catch (error) {
-      alert(error.response?.data?.detail || "Error reserving book.");
+      setReservationStatus({ 
+        type: 'error', 
+        message: error.response?.data?.detail || "An unexpected error occurred while reserving the book." 
+      });
     }
   };
 
@@ -185,7 +223,7 @@ function MemberDashboard({ user }) {
                       {notifications.map(notif => (
                         <div key={notif.id} className={`p-4 transition-colors ${notif.is_read ? 'bg-white opacity-60' : 'bg-emerald-50/50 cursor-pointer hover:bg-emerald-50'}`} onClick={() => !notif.is_read && markAsRead(notif.id)}>
                           <div className="flex gap-3">
-                            <span className="text-xl shrink-0">{notif.message.includes('Reminder') ? '⚠️' : '📩'}</span>
+                            <span className="text-xl shrink-0">{notif.message.includes('Reminder') || notif.message.includes('System Notice') ? '⚠️' : '📩'}</span>
                             <div>
                               <p className={`text-sm ${notif.is_read ? 'text-slate-600' : 'text-slate-900 font-medium'}`}>{notif.message}</p>
                               <p className="text-[10px] text-slate-400 mt-1">{new Date(notif.created_at).toLocaleString()}</p>
@@ -269,19 +307,21 @@ function MemberDashboard({ user }) {
                         <th className="p-4 pl-6 font-semibold">Book Title</th>
                         <th className="p-4 font-semibold">Due Date</th>
                         <th className="p-4 font-semibold">Status</th>
+                        <th className="p-4 font-semibold text-right pr-6">Action</th>
                       </tr>
                     </thead>
                     <tbody className="text-sm divide-y divide-stone-100 bg-white">
                       {isLoading ? (
-                         <tr><td colSpan="3" className="p-6 text-center text-slate-500">Loading your history...</td></tr>
+                         <tr><td colSpan="4" className="p-6 text-center text-slate-500">Loading your history...</td></tr>
                       ) : myTransactions.length === 0 ? (
-                         <tr><td colSpan="3" className="p-6 text-center text-slate-500">You don't have any borrowed books right now.</td></tr>
+                         <tr><td colSpan="4" className="p-6 text-center text-slate-500">You don't have any borrowed books right now.</td></tr>
                       ) : (
                         myTransactions.map((tx) => {
                           const statusStyle = 
                             tx.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
                             tx.status === 'PENDING' ? 'bg-purple-100 text-purple-800' :
                             tx.status === 'RETURNED' ? 'bg-stone-100 text-stone-500' :
+                            tx.status === 'CANCELLED' ? 'bg-stone-200 text-stone-500' :
                             'bg-red-100 text-red-800';
 
                           return (
@@ -293,6 +333,17 @@ function MemberDashboard({ user }) {
                                   {tx.status}
                                 </span>
                               </td>
+
+                              <td className="p-4 text-right pr-6">
+                                {tx.status === 'PENDING' && (
+                                  <button 
+                                    onClick={() => handleCancelReservation(tx.id)}
+                                    className="text-[10px] bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg font-bold transition-colors border border-red-100"
+                                  >
+                                    Cancel
+                                  </button>
+                                )}
+                              </td>
                             </tr>
                           );
                         })
@@ -303,7 +354,6 @@ function MemberDashboard({ user }) {
               </div>
             </div>
           )}
-
         </div>
       </main>
 
@@ -322,7 +372,7 @@ function MemberDashboard({ user }) {
             <div className="p-8 md:w-3/5 bg-white flex flex-col relative">
               <button onClick={() => setSelectedBook(null)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-800 transition-colors font-bold">&times;</button>
               
-              <div className="mb-8">
+              <div className="mb-4">
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{selectedBook.category}</p>
                 <h2 className="text-2xl font-serif font-bold text-slate-900 leading-tight mb-2">{selectedBook.title}</h2>
                 <p className="text-sm text-slate-600 mb-6">By <span className="font-bold">{selectedBook.author}</span></p>
@@ -333,6 +383,23 @@ function MemberDashboard({ user }) {
                   <div className="flex justify-between"><span className="text-xs text-slate-500">Copies in Library</span><span className="text-xs font-bold text-slate-800">{selectedBook.copies?.length || 0}</span></div>
                 </div>
               </div>
+
+              {(selectedBook.active_copies_count ?? (selectedBook.copies?.length || 0)) > 0 && (
+                <div className="mb-6">
+                  <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
+                    Expected Pickup Date <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    type="date" 
+                    min={minDateStr} 
+                    max={maxDateStr}
+                    value={pickupDate}
+                    onChange={(e) => setPickupDate(e.target.value)}
+                    className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#1a3626] text-sm text-slate-700 font-medium cursor-pointer"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1.5 italic">Note: Reservations automatically expire if not picked up by this date.</p>
+                </div>
+              )}
 
               <div className="mt-auto flex gap-3">
                 <button onClick={() => setSelectedBook(null)} className="w-1/3 px-4 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-100 transition-colors border border-stone-200">Cancel</button>
@@ -345,13 +412,59 @@ function MemberDashboard({ user }) {
                     : 'bg-stone-200 text-stone-400 cursor-not-allowed'
                   }`}
                 >
-                  {(selectedBook.active_copies_count ?? (selectedBook.copies?.length || 0)) > 0 ? 'Reserve Book' : 'Not Available'}
+                  {(selectedBook.active_copies_count ?? (selectedBook.copies?.length || 0)) > 0 ? 'Confirm Reserve' : 'Not Available'}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {reservationStatus && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100 p-8 text-center flex flex-col items-center">
+            
+            {reservationStatus.type === 'success' ? (
+              <>
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mb-4 shadow-inner">
+                  🎉
+                </div>
+                <h3 className="font-serif font-bold text-2xl text-slate-900 mb-2">Reservation Successful!</h3>
+                <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+                  <strong>"{reservationStatus.title}"</strong> is now pending. Please visit the library desk to pick it up.
+                </p>
+                <button
+                  onClick={() => {
+                    setReservationStatus(null);
+                    setActiveTab('mybooks');
+                  }}
+                  className="w-full bg-[#1a3626] text-white px-6 py-3 rounded-xl font-bold hover:bg-[#0f2117] transition-colors shadow-md"
+                >
+                  View in My Books
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl mb-4 shadow-inner">
+                  ⚠️
+                </div>
+                <h3 className="font-serif font-bold text-2xl text-slate-900 mb-2">Reservation Failed</h3>
+                <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+                  {reservationStatus.message}
+                </p>
+                <button
+                  onClick={() => setReservationStatus(null)}
+                  className="w-full bg-stone-100 text-slate-700 px-6 py-3 rounded-xl font-bold hover:bg-stone-200 transition-colors"
+                >
+                  Close
+                </button>
+              </>
+            )}
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -14,8 +14,9 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
 
   const [isScanning, setIsScanning] = useState(false);
   const [scannedBook, setScannedBook] = useState(null);
-
   const [scannedCopiesCount, setScannedCopiesCount] = useState('1');
+  
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState('');
 
   useEffect(() => {
     if (isScanning) {
@@ -93,7 +94,8 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
     try {
       await api.delete(`/catalog/books/${bookToDelete.id}/`);
       fetchBooks(); showNotification("Deleted successfully.", "success");
-    } catch (error) { showNotification("Error deleting.", "error"); } 
+    } catch (error) { showNotification("Error deleting.", "error");
+    } 
     finally { setBookToDelete(null); }
   };
 
@@ -116,7 +118,6 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
-
     iframe.contentDocument.write(`
       <html>
         <head>
@@ -128,10 +129,7 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
             h3 { font-size: 14px; margin: 10px 0 5px; color: #14291c; font-weight: 800; line-height: 1.2; }
             p { font-size: 11px; color: #555; margin: 0; }
             img { max-width: 150px; height: auto; margin-bottom: 5px; }
-            @media print { 
-              body { padding: 0; } 
-              .sticker { border: none; padding: 0; }
-            }
+            @media print { body { padding: 0; } .sticker { border: none; padding: 0; } }
           </style>
         </head>
         <body>
@@ -156,34 +154,110 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
     }, 250);
   };
 
+  const filteredCatalogBooks = books.filter(book => 
+    book.title.toLowerCase().includes(catalogSearchQuery.toLowerCase()) || 
+    book.author.toLowerCase().includes(catalogSearchQuery.toLowerCase()) || 
+    book.isbn.includes(catalogSearchQuery)
+  );
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
         <div className="bg-[#14291c] p-4 px-6 border-b border-emerald-800"><h3 className="font-serif font-bold text-lg text-white">Register New Book</h3></div>
-        <form onSubmit={handleAddBook} className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2"><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Title</label><input required value={newBook.title} onChange={(e) => setNewBook({...newBook, title: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" /></div>
-          <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ISBN</label><input required value={newBook.isbn} onChange={(e) => setNewBook({...newBook, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" /></div>
-          <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Author</label><input required value={newBook.author} onChange={(e) => setNewBook({...newBook, author: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" /></div>
-          <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Category</label><select value={newBook.category} onChange={(e) => setNewBook({...newBook, category: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]"><option value="Computer Science">Computer Science</option><option value="Fiction">Fiction</option><option value="Science">Science</option><option value="Mathematics">Mathematics</option></select></div>
-          <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Copies</label><input type="number" required value={copiesToCreate} onChange={(e) => setCopiesToCreate(e.target.value)} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" min="1" /></div>
-          <div className="md:col-span-3 flex justify-end mt-2"><button type="submit" className="bg-[#14291c] text-white px-8 py-3 rounded-lg font-bold hover:bg-[#0c1a11] transition-all shadow-md">Save Book</button></div>
+        
+        <form onSubmit={handleAddBook} className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+          <div className="md:col-span-2 space-y-4">
+             <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Title</label><input required value={newBook.title} onChange={(e) => setNewBook({...newBook, title: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" /></div>
+             <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ISBN</label><input required value={newBook.isbn} onChange={(e) => setNewBook({...newBook, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" /></div>
+                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Total Copies</label><input type="number" required value={copiesToCreate} onChange={(e) => setCopiesToCreate(e.target.value)} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" min="1" /></div>
+             </div>
+             <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Author</label><input required value={newBook.author} onChange={(e) => setNewBook({...newBook, author: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" /></div>
+
+             <div>
+               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Category</label>
+               <input 
+                 type="text" 
+                 value={newBook.category} 
+                 onChange={(e) => setNewBook({...newBook, category: e.target.value})} 
+                 className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" 
+                 placeholder="Type or click a category below..." 
+                 required
+               />
+               <div className="flex gap-2 mt-2 flex-wrap">
+                 {['Computer Science', 'Fiction', 'Science', 'Mathematics'].map(cat => (
+                   <button 
+                     key={cat}
+                     type="button" 
+                     onClick={() => setNewBook({...newBook, category: cat})} 
+                     className="text-[10px] font-bold bg-stone-100 hover:bg-stone-200 text-stone-600 px-3 py-1.5 rounded-full border border-stone-200 transition-colors"
+                   >
+                     + {cat}
+                   </button>
+                 ))}
+               </div>
+             </div>
+          </div>
+
+          <div className="md:col-span-2 flex flex-col items-center justify-center p-6 bg-stone-50 rounded-xl border border-stone-100 h-full">
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">QR Preview</label>
+            {newBook.isbn ? (
+              <>
+                <div className="bg-white p-3 rounded-lg shadow-sm border border-stone-200">
+                  <QRCodeCanvas id="new-book-qr" value={`ISBN: ${newBook.isbn}\nTitle: ${newBook.title}\nAuthor: ${newBook.author}`} size={160} />
+                </div>
+                <button type="button" onClick={() => {
+                  const canvas = document.getElementById('new-book-qr');
+                  if(canvas) {
+                    const url = canvas.toDataURL("image/png");
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `QR_${newBook.isbn}.png`;
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                  }
+                }} className="mt-4 text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-2">
+                  <span>⬇️</span> Download QR Code
+                </button>
+              </>
+            ) : (
+              <div className="w-40 h-40 bg-stone-100 rounded-lg flex items-center justify-center text-stone-400 text-xs text-center p-4">Enter ISBN to preview QR Code</div>
+            )}
+            <p className="text-[10px] text-slate-400 mt-4 font-medium uppercase tracking-wider">ISBN: {newBook.isbn || '----------'}</p>
+          </div>
+
+          <div className="md:col-span-4 flex justify-end mt-2"><button type="submit" className="bg-[#14291c] text-white px-8 py-3 rounded-lg font-bold hover:bg-[#0c1a11] transition-all shadow-md">Save Book</button></div>
         </form>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-stone-100 flex justify-between items-center bg-white">
-           <h3 className="font-serif font-bold text-lg text-slate-900">Full Catalog</h3>
-           <button onClick={() => setIsScanning(true)} className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-100 flex items-center gap-2 transition-colors border border-indigo-100">
+
+        <div className="p-6 border-b border-stone-100 flex flex-col sm:flex-row justify-between items-center bg-white gap-4">
+           <h3 className="font-serif font-bold text-lg text-slate-900 shrink-0">Full Catalog</h3>
+           
+           <div className="relative w-full sm:max-w-xs md:max-w-md ml-auto">
+             <span className="absolute left-3 top-2.5 text-stone-400 text-sm">🔍</span>
+             <input 
+               type="text" 
+               placeholder="Search title, author, or ISBN..." 
+               className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#14291c] transition-all"
+               value={catalogSearchQuery}
+               onChange={(e) => setCatalogSearchQuery(e.target.value)}
+             />
+           </div>
+
+           <button onClick={() => setIsScanning(true)} className="shrink-0 bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-indigo-100 flex items-center gap-2 transition-colors border border-indigo-100">
              <span>📷</span> Scan QR to Add Copy
            </button>
         </div>
+        
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead><tr className="bg-stone-50 text-xs text-slate-500 uppercase tracking-wider border-b border-stone-100"><th className="p-4 pl-6 font-semibold">Title & ISBN</th><th className="p-4 font-semibold">Author</th><th className="p-4 font-semibold">Copies (Avail)</th><th className="p-4 font-semibold text-right pr-6">Action</th></tr></thead>
             <tbody className="text-sm divide-y divide-stone-100 bg-white">
               {isLoadingBooks ? (<tr><td colSpan="4" className="p-6 text-center text-slate-500">Loading...</td></tr>) : 
-               books.length === 0 ? (<tr><td colSpan="4" className="p-6 text-center text-slate-500">No books found.</td></tr>) : 
-               books.map((book) => (
+               books.length === 0 ? (<tr><td colSpan="4" className="p-6 text-center text-slate-500">No books found in inventory.</td></tr>) : 
+               filteredCatalogBooks.length === 0 ? (<tr><td colSpan="4" className="p-6 text-center text-slate-500">No matching books found for "{catalogSearchQuery}".</td></tr>) : 
+               filteredCatalogBooks.map((book) => (
                 <tr key={book.id} className="hover:bg-stone-50/50 transition-colors">
                   <td className="p-4 pl-6"><p className="font-bold text-slate-900">{book.title}</p><p className="text-xs text-slate-500 mt-0.5">ISBN: {book.isbn}</p></td>
                   <td className="p-4 text-slate-600">{book.author}</td>
@@ -210,7 +284,7 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
               </div>
               <div className="p-6 bg-stone-50">
                  <p className="text-sm text-slate-500 mb-4">Position the book's QR code inside the frame to automatically add copies to the inventory.</p>
-                 <div id="qr-reader" className="mx-auto overflow-hidden rounded-xl border-2 border-indigo-200 bg-white min-h-62.5"></div>
+                 <div id="qr-reader" className="mx-auto overflow-hidden rounded-xl border-2 border-indigo-200 bg-white min-h-[250px]"></div>
               </div>
               <div className="p-4 bg-white border-t border-stone-100">
                 <button onClick={() => setIsScanning(false)} className="w-full px-4 py-3 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors border border-stone-200">Cancel Scanning</button>
@@ -295,7 +369,10 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
               <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Title</label><input required value={editingBook.title} onChange={(e) => setEditingBook({...editingBook, title: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">ISBN</label><input required value={editingBook.isbn} onChange={(e) => setEditingBook({...editingBook, isbn: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" /></div>
-                <div><label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label><select value={editingBook.category} onChange={(e) => setEditingBook({...editingBook, category: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]"><option value="Computer Science">Computer Science</option><option value="Fiction">Fiction</option></select></div>
+                <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Category</label>
+                   <input value={editingBook.category} onChange={(e) => setEditingBook({...editingBook, category: e.target.value})} className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" />
+                </div>
               </div>
               <div className="flex justify-end gap-3 mt-6"><button type="button" onClick={() => setEditingBook(null)} className="px-6 py-2.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100">Cancel</button><button type="submit" className="bg-[#14291c] text-white px-6 py-2.5 rounded-lg font-bold hover:bg-[#0c1a11]">Save Changes</button></div>
             </form>
@@ -304,8 +381,8 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
       )}
 
       {bookToDelete && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-8 text-center">
+       <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-stone-100 p-8 text-center">
               <h3 className="font-serif font-bold text-xl text-slate-900 mb-3">Delete Book?</h3>
               <p className="text-slate-500 text-sm mb-8">Are you sure you want to delete <span className="font-bold">"{bookToDelete.title}"</span>?</p>
               <div className="flex justify-center gap-3">
@@ -317,8 +394,8 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
       )}
 
       {addingCopiesToBook && (
-         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-stone-100">
             <div className="bg-[#14291c] p-4 px-6 flex justify-between items-center"><h3 className="font-serif font-bold text-lg text-white">Add Copies</h3><button onClick={() => setAddingCopiesToBook(null)} className="text-emerald-200 hover:text-white">&times;</button></div>
             <form onSubmit={handleAddExtraCopies} className="p-6 text-center">
               <p className="text-sm text-slate-500 mb-4">Adding to: <span className="font-bold text-slate-900">{addingCopiesToBook.title}</span></p>
@@ -331,4 +408,5 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
     </div>
   );
 }
+
 export default Inventory;

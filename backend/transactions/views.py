@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.utils import timezone        
-from datetime import timedelta           
+from datetime import timedelta, datetime
 
 from catalog.models import BookCopy
 from users.models import Notification
@@ -17,6 +17,24 @@ class TransactionViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated] 
 
     def get_queryset(self):
+
+        today = timezone.now().date()
+
+        expired_transactions = Transaction.objects.filter(status='PENDING', expected_pickup_date__lt=today)
+        
+        for tx in expired_transactions:
+            tx.status = 'CANCELLED'
+            tx.save()
+
+            if tx.book_copy:
+                tx.book_copy.status = 'AVAILABLE'
+                tx.book_copy.save()
+
+            Notification.objects.create(
+                user=tx.user,
+                message=f"System Notice: Your reservation for '{tx.book_copy.book.title}' was automatically cancelled because the pickup date passed."
+            )
+
         user = self.request.user
         if user.role in ['ADMIN', 'LIBRARIAN']:
             return Transaction.objects.all().order_by('-reservation_date')
@@ -54,22 +72,37 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
         else:
             isbn = request.data.get('isbn')
+            pickup_date_str = request.data.get('expected_pickup_date')
             
             if not isbn:
                 return Response({"detail": "ISBN is required."}, status=status.HTTP_400_BAD_REQUEST)
+            if not pickup_date_str:
+                 return Response({"detail": "Please select a valid pickup date."}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                pickup_date = datetime.strptime(pickup_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({"detail": "Invalid date format."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            today = timezone.now().date()
+            if pickup_date < today:
+                 return Response({"detail": "Pickup date cannot be in the past."}, status=status.HTTP_400_BAD_REQUEST)
+            if pickup_date > today + timedelta(days=3):
+                 return Response({"detail": "Reservation limit exceeded. You must pick up the book within 3 days."}, status=status.HTTP_400_BAD_REQUEST)
 
             book_copy = BookCopy.objects.filter(book__isbn=isbn, status='AVAILABLE').first()
             
             if not book_copy:
                 return Response({"detail": "Sorry, no copies are currently available."}, status=status.HTTP_400_BAD_REQUEST)
 
-            default_due_date = timezone.now() + timedelta(days=7)
+            default_due_date = pickup_date + timedelta(days=7)
 
             transaction = Transaction.objects.create(
                 user=request.user,
                 book_copy=book_copy,
                 status='PENDING',
-                due_date=default_due_date
+                due_date=default_due_date,
+                expected_pickup_date=pickup_date
             )
 
             book_copy.status = 'BORROWED' 
@@ -108,3 +141,22 @@ class TransactionViewSet(viewsets.ModelViewSet):
         )
 
         return Response({"status": "Reminder notification created successfully!"}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=['post'])
+    def cancel_reservation(self, request, pk=None):
+        transaction = self.get_object()
+
+        if transaction.user != request.user:
+            return Response({"detail": "You do not have permission to cancel this reservation."}, status=status.HTTP_403_FORBIDDEN)
+
+        if transaction.status != 'PENDING':
+            return Response({"detail": "Only pending reservations can be cancelled."}, status=status.HTTP_400_BAD_REQUEST)
+
+        transaction.status = 'CANCELLED'
+        transaction.save()
+
+        if transaction.book_copy:
+            transaction.book_copy.status = 'AVAILABLE'
+            transaction.book_copy.save()
+
+        return Response({"status": "Reservation cancelled successfully."}, status=status.HTTP_200_OK)
