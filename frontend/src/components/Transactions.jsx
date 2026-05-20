@@ -6,7 +6,10 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
 
   const [txFilter, setTxFilter] = useState('active');
   const [newTx, setNewTx] = useState({ member_id: '', isbn: '', due_date: '' });
+
   const [transactionToMarkLost, setTransactionToMarkLost] = useState(null);
+  const [reservationToDeny, setReservationToDeny] = useState(null);
+
   const [isScanning, setIsScanning] = useState(false);
 
   const [bookSearchQuery, setBookSearchQuery] = useState('');
@@ -58,7 +61,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
       showNotification("Book successfully issued!", "success");
       setNewTx({ member_id: '', isbn: '', due_date: '' }); 
       setBookSearchQuery(''); 
-      setMemberSearchQuery('');
+      setMemberSearchQuery(''); 
       fetchTransactions(); 
       fetchBooks();
     } catch (error) { 
@@ -92,12 +95,17 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
     } catch (error) { showNotification("Error approving reservation.", "error"); }
   };
 
-  const handleDenyReservation = async (transactionId) => {
+  const confirmDenyReservation = async () => {
+    if (!reservationToDeny) return;
     try {
-      await api.patch(`/transactions/${transactionId}/`, { status: 'CANCELLED' });
+      await api.patch(`/transactions/${reservationToDeny.id}/`, { status: 'CANCELLED' });
       showNotification("Reservation denied and cancelled.", "success");
       fetchTransactions(); fetchBooks();
-    } catch (error) { showNotification("Error cancelling reservation.", "error"); }
+    } catch (error) { 
+      showNotification("Error cancelling reservation.", "error"); 
+    } finally {
+      setReservationToDeny(null);
+    }
   };
 
   const handleSendReminder = async (tx) => {
@@ -151,6 +159,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
         <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
           <div className="bg-[#14291c] p-4 border-b border-emerald-800"><h3 className="font-serif font-bold text-lg text-white">Issue Book</h3></div>
           <form onSubmit={handleIssueBook} className="p-6 space-y-4">
+            
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Student/Member Name</label>
               <div className="relative">
@@ -177,7 +186,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                            className="p-3 hover:bg-stone-50 cursor-pointer border-b border-stone-100 last:border-0 transition-colors"
                            onClick={() => {
                               setNewTx({ ...newTx, member_id: member.username }); 
-                              setMemberSearchQuery(`${member.first_name} ${member.last_name}`);
+                              setMemberSearchQuery(`${member.first_name} ${member.last_name}`); 
                               setIsSuggestingMember(false);
                            }}
                          >
@@ -293,7 +302,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                            
                            {tx.status === 'PENDING' ? (
                              <div className="flex items-center justify-end gap-2">
-                               <button onClick={() => handleDenyReservation(tx.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-red-100">Deny</button>
+                               <button onClick={() => setReservationToDeny(tx)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-red-100">Deny</button>
                                <button onClick={() => handleApproveReservation(tx.id)} className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-emerald-200">Approve</button>
                              </div>
                            ) : tx.status === 'ACTIVE' ? (
@@ -334,6 +343,26 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
            </div>
         </div>
       )}
+
+      {reservationToDeny && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-8 text-center">
+            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">
+              ⚠️
+            </div>
+            <h3 className="font-serif font-bold text-xl text-slate-900 mb-3">Deny Reservation?</h3>
+            <p className="text-slate-500 text-sm mb-8">
+              Are you sure you want to deny the reservation for <br/>
+              <span className="font-bold text-slate-800">"{reservationToDeny.book_title}"</span> <br/>
+              by <span className="font-bold text-slate-800">{reservationToDeny.user?.first_name || reservationToDeny.user?.username || 'this user'}</span>?
+            </p>
+            <div className="flex justify-center gap-3">
+              <button onClick={() => setReservationToDeny(null)} className="px-6 py-3 rounded-lg font-bold text-slate-600 w-1/2 hover:bg-slate-100 transition-colors border border-stone-200">Cancel</button>
+              <button onClick={confirmDenyReservation} className="bg-red-600 text-white px-6 py-3 rounded-lg font-bold w-1/2 hover:bg-red-700 transition-colors shadow-md">Yes, Deny</button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {transactionToMarkLost && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -350,4 +379,5 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
     </div>
   );
 }
+
 export default Transactions;

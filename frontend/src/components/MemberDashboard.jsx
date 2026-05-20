@@ -17,6 +17,7 @@ function MemberDashboard({ user }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const [pickupDate, setPickupDate] = useState('');
+  const [reservationToCancel, setReservationToCancel] = useState(null);
 
   const notifRef = useRef(null);
   const navigate = useNavigate(); 
@@ -50,7 +51,6 @@ function MemberDashboard({ user }) {
 
   const fetchMemberData = async () => {
     setIsLoading(true);
-    
     try {
       try {
         const booksRes = await api.get('/catalog/books/');
@@ -81,7 +81,6 @@ function MemberDashboard({ user }) {
         console.warn("Notifications not ready yet:", notifErr);
         setNotifications([]); 
       }
-      
     } finally {
       setIsLoading(false);
     }
@@ -108,28 +107,27 @@ function MemberDashboard({ user }) {
     }
   };
 
-  const handleCancelReservation = async (transactionId) => {
-    if (!window.confirm("Are you sure you want to cancel this reservation?")) return;
+  const confirmCancelReservation = async () => {
+    if (!reservationToCancel) return;
     
     try {
-      await api.post(`/transactions/${transactionId}/cancel_reservation/`);
-      alert("Reservation cancelled successfully.");
-      fetchMemberData();
+      await api.post(`/transactions/${reservationToCancel.id}/cancel_reservation/`);
+      fetchMemberData(); 
     } catch (error) {
       alert(error.response?.data?.detail || "Error cancelling reservation.");
+    } finally {
+      setReservationToCancel(null); 
     }
   };
 
   const handleReserveBook = async () => {
     if (!selectedBook) return;
-
     if (!pickupDate) {
       alert("Please select a pickup date.");
       return;
     }
 
     try {
-
       await api.post('/transactions/', { 
         isbn: selectedBook.isbn,
         expected_pickup_date: pickupDate 
@@ -333,11 +331,10 @@ function MemberDashboard({ user }) {
                                   {tx.status}
                                 </span>
                               </td>
-
                               <td className="p-4 text-right pr-6">
                                 {tx.status === 'PENDING' && (
                                   <button 
-                                    onClick={() => handleCancelReservation(tx.id)}
+                                    onClick={() => setReservationToCancel(tx)}
                                     className="text-[10px] bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg font-bold transition-colors border border-red-100"
                                   >
                                     Cancel
@@ -420,6 +417,35 @@ function MemberDashboard({ user }) {
         </div>
       )}
 
+      {reservationToCancel && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-8 text-center">
+            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">
+              ⚠️
+            </div>
+            <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">Cancel Reservation?</h3>
+            <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+              Are you sure you want to cancel your reservation for <br/>
+              <strong className="text-slate-800">"{reservationToCancel.book_title}"</strong>?
+            </p>
+            <div className="flex justify-center gap-3">
+              <button 
+                onClick={() => setReservationToCancel(null)} 
+                className="px-6 py-3 rounded-xl font-bold text-slate-600 w-1/2 hover:bg-slate-100 transition-colors border border-stone-200"
+              >
+                Keep It
+              </button>
+              <button 
+                onClick={confirmCancelReservation} 
+                className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold w-1/2 hover:bg-red-700 transition-colors shadow-md"
+              >
+                Yes, Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {reservationStatus && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100 p-8 text-center flex flex-col items-center">
@@ -431,7 +457,7 @@ function MemberDashboard({ user }) {
                 </div>
                 <h3 className="font-serif font-bold text-2xl text-slate-900 mb-2">Reservation Successful!</h3>
                 <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                  <strong>"{reservationStatus.title}"</strong> is now pending. Please visit the library desk to pick it up.
+                  <strong>"{reservationStatus.title}"</strong> is now pending. Please visit the library desk to pick it up on your selected date.
                 </p>
                 <button
                   onClick={() => {
@@ -460,11 +486,9 @@ function MemberDashboard({ user }) {
                 </button>
               </>
             )}
-
           </div>
         </div>
       )}
-
     </div>
   );
 }

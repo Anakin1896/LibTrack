@@ -11,13 +11,17 @@ class TransactionUserSerializer(serializers.ModelSerializer):
         fields = ['username', 'first_name', 'last_name']
 
 class TransactionSerializer(serializers.ModelSerializer):
-
     user = TransactionUserSerializer(read_only=True)
     book_title = serializers.ReadOnlyField(source='book_copy.book.title')
+    expected_pickup_date = serializers.DateField(
+        required=False, 
+        allow_null=True, 
+        input_formats=['%Y-%m-%d', 'iso-8601']
+    )
 
     class Meta:
         model = Transaction
-        fields = ('id', 'user', 'book_copy', 'book_title', 'reservation_date', 'due_date', 'status', 'return_date')
+        fields = ('id', 'user', 'book_copy', 'book_title', 'reservation_date', 'due_date', 'status', 'return_date', 'expected_pickup_date')
 
     def validate(self, data):
         book_copy = data.get('book_copy')
@@ -27,7 +31,5 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         transaction = Transaction.objects.create(**validated_data)
-        book_copy = validated_data['book_copy']
-        book_copy.status = 'RESERVED'
-        book_copy.save()
+
         return transaction

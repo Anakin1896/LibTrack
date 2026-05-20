@@ -77,7 +77,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
             if not isbn:
                 return Response({"detail": "ISBN is required."}, status=status.HTTP_400_BAD_REQUEST)
             if not pickup_date_str:
-                 return Response({"detail": "Please select a valid pickup date."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"detail": "Please select a valid pickup date."}, status=status.HTTP_400_BAD_REQUEST)
 
             try:
                 pickup_date = datetime.strptime(pickup_date_str, '%Y-%m-%d').date()
@@ -95,7 +95,8 @@ class TransactionViewSet(viewsets.ModelViewSet):
             if not book_copy:
                 return Response({"detail": "Sorry, no copies are currently available."}, status=status.HTTP_400_BAD_REQUEST)
 
-            default_due_date = pickup_date + timedelta(days=7)
+            pickup_datetime = timezone.make_aware(datetime.combine(pickup_date, datetime.min.time()))
+            default_due_date = pickup_datetime + timedelta(days=7)
 
             transaction = Transaction.objects.create(
                 user=request.user,
@@ -115,6 +116,10 @@ class TransactionViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
     def perform_update(self, serializer):
+        
+        old_instance = self.get_object()
+        old_status = old_instance.status
+
         instance = serializer.save()
         copy = instance.book_copy
 
@@ -124,6 +129,17 @@ class TransactionViewSet(viewsets.ModelViewSet):
         elif instance.status == 'LOST':
             copy.status = 'LOST'
             copy.save()
+
+        if old_status == 'PENDING' and instance.status == 'CANCELLED':
+            Notification.objects.create(
+                user=instance.user,
+                message=f"Library Notice: Your reservation request for '{copy.book.title}' was denied by the librarian."
+            )
+        elif old_status == 'PENDING' and instance.status == 'ACTIVE':
+            Notification.objects.create(
+                user=instance.user,
+                message=f"Library Notice: Good news! Your reservation for '{copy.book.title}' has been approved and issued to you."
+            )
 
     @action(detail=True, methods=['post'])
     def remind(self, request, pk=None):
