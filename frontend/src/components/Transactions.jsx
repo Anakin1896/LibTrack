@@ -9,12 +9,12 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
 
   const [transactionToMarkLost, setTransactionToMarkLost] = useState(null);
   const [reservationToDeny, setReservationToDeny] = useState(null);
+  const [transactionToResolve, setTransactionToResolve] = useState(null);
 
   const [isScanning, setIsScanning] = useState(false);
 
   const [bookSearchQuery, setBookSearchQuery] = useState('');
   const [isSuggesting, setIsSuggesting] = useState(false);
-
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [isSuggestingMember, setIsSuggestingMember] = useState(false);
 
@@ -102,9 +102,22 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
       showNotification("Reservation denied and cancelled.", "success");
       fetchTransactions(); fetchBooks();
     } catch (error) { 
-      showNotification("Error cancelling reservation.", "error"); 
+      showNotification("Error cancelling reservation.", "error");
     } finally {
       setReservationToDeny(null);
+    }
+  };
+
+  const confirmResolveLost = async () => {
+    if (!transactionToResolve) return;
+    try {
+      await api.patch(`/transactions/${transactionToResolve.id}/`, { status: 'RESOLVED' });
+      showNotification("Lost book penalty resolved.", "success"); 
+      fetchTransactions(); fetchBooks();
+    } catch (error) { 
+      showNotification("Error resolving transaction.", "error"); 
+    } finally { 
+      setTransactionToResolve(null); 
     }
   };
 
@@ -120,6 +133,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
 
   const getTxStatus = (tx) => {
     if (tx.status === 'LOST') return { text: 'Lost', style: 'bg-slate-800 text-white border-slate-900' };
+    if (tx.status === 'RESOLVED') return { text: 'Resolved', style: 'bg-blue-50 text-blue-600 border-blue-200' };
     if (tx.status === 'CANCELLED') return { text: 'Cancelled', style: 'bg-stone-100 text-stone-500 border-stone-200' };
     if (tx.status === 'PENDING') return { text: 'Pending', style: 'bg-purple-100 text-purple-800 border-purple-200' };
     if (tx.status === 'RETURNED') {
@@ -141,18 +155,16 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
     if (txFilter === 'pending') return tx.status === 'PENDING';
     return true; 
   });
-
   const bookSuggestions = bookSearchQuery.trim() === '' 
     ? [] 
     : books.filter(b => b.title.toLowerCase().includes(bookSearchQuery.toLowerCase()) || b.isbn.includes(bookSearchQuery)).slice(0, 5);
-
   const memberSuggestions = memberSearchQuery.trim() === '' 
     ? [] 
     : members.filter(m => 
         `${m.first_name} ${m.last_name}`.toLowerCase().includes(memberSearchQuery.toLowerCase()) || 
         m.username.toLowerCase().includes(memberSearchQuery.toLowerCase())
       ).slice(0, 5);
-
+      
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
       <div className="lg:col-span-1 space-y-6">
@@ -161,7 +173,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
           <form onSubmit={handleIssueBook} className="p-6 space-y-4">
             
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Student/Member Name</label>
+               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Student/Member Name</label>
               <div className="relative">
                 <input 
                   required 
@@ -175,7 +187,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                   onBlur={() => setTimeout(() => setIsSuggestingMember(false), 200)}
                   className="w-full p-3 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-[#14291c]" 
                   placeholder="Search name or ID..." 
-                  autoComplete="off"
+                   autoComplete="off"
                 />
                 
                 {isSuggestingMember && memberSuggestions.length > 0 && (
@@ -185,14 +197,14 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                            key={member.id} 
                            className="p-3 hover:bg-stone-50 cursor-pointer border-b border-stone-100 last:border-0 transition-colors"
                            onClick={() => {
-                              setNewTx({ ...newTx, member_id: member.username }); 
+                              setNewTx({ ...newTx, member_id: member.username });
                               setMemberSearchQuery(`${member.first_name} ${member.last_name}`); 
                               setIsSuggestingMember(false);
                            }}
                          >
                            <p className="font-bold text-sm text-slate-800 truncate">{member.first_name} {member.last_name}</p>
                            <p className="text-[10px] font-mono text-slate-400 mt-0.5">ID: {member.username}</p>
-                         </div>
+                          </div>
                       ))}
                    </div>
                 )}
@@ -237,12 +249,12 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                          >
                            <p className="font-bold text-sm text-slate-800 truncate">{book.title}</p>
                            <p className="text-[10px] font-mono text-slate-400 mt-0.5">ISBN: {book.isbn}</p>
-                         </div>
+                          </div>
                       ))}
                    </div>
                 )}
               </div>
-            </div>
+             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Due Date</label>
@@ -292,7 +304,7 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                        : '-';
 
                      return (
-                      <tr key={tx.id} className={`hover:bg-stone-50/50 ${tx.status === 'RETURNED' || tx.status === 'LOST' || tx.status === 'CANCELLED' ? 'opacity-60' : ''}`}>
+                       <tr key={tx.id} className={`hover:bg-stone-50/50 ${['RETURNED', 'LOST', 'CANCELLED', 'RESOLVED'].includes(tx.status) ? 'opacity-60' : ''}`}>
                          <td className="p-4 pl-6 font-bold">{tx.user?.username || tx.member_id || "Unknown"}</td>
                          <td className="p-4 text-slate-600">{borrowerName}</td>
                          <td className="p-4 max-w-50 truncate" title={tx.book_title}>{tx.book_title}</td>
@@ -310,6 +322,10 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
                                <button onClick={() => handleSendReminder(tx)} className="text-blue-500 hover:text-blue-700 text-xs font-bold">Remind</button>
                                <button onClick={() => setTransactionToMarkLost(tx)} className="text-red-500 hover:text-red-700 text-xs font-bold">Lost?</button>
                                <button onClick={() => handleReturnBook(tx.id)} className="bg-stone-100 px-4 py-2 rounded-lg text-xs font-bold text-[#14291c] hover:bg-emerald-100 hover:text-emerald-800 border border-stone-200 transition-colors">Return</button>
+                             </div>
+                           ) : tx.status === 'LOST' ? (
+                             <div className="flex items-center justify-end gap-3">
+                               <button onClick={() => setTransactionToResolve(tx)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-blue-200">Resolve</button>
                              </div>
                            ) : (
                              <span className="text-xs font-bold text-stone-400 px-4 py-2">Completed</span>
@@ -372,6 +388,25 @@ function Transactions({ transactions, isLoadingTx, fetchTransactions, fetchBooks
             <div className="flex justify-center gap-3">
               <button onClick={() => setTransactionToMarkLost(null)} className="px-6 py-3 rounded-lg font-bold text-slate-600 w-1/2 hover:bg-slate-100 transition-colors">Cancel</button>
               <button onClick={confirmMarkLost} className="bg-red-600 text-white px-6 py-3 rounded-lg font-bold w-1/2 hover:bg-red-700 transition-colors">Yes, Mark Lost</button>
+            </div>
+          </div>
+         </div>
+      )}
+
+      {transactionToResolve && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-8 text-center">
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">
+              ✅
+            </div>
+            <h3 className="font-serif font-bold text-xl text-slate-900 mb-3">Resolve Penalty?</h3>
+            <p className="text-slate-500 text-sm mb-8">
+              Has the student settled the penalty for the lost book <br/>
+              <span className="font-bold text-slate-800">"{transactionToResolve.book_title}"</span>?
+            </p>
+            <div className="flex justify-center gap-3">
+              <button onClick={() => setTransactionToResolve(null)} className="px-6 py-3 rounded-lg font-bold text-slate-600 w-1/2 hover:bg-slate-100 transition-colors border border-stone-200">Cancel</button>
+              <button onClick={confirmResolveLost} className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold w-1/2 hover:bg-blue-700 transition-colors shadow-md">Yes, Resolve</button>
             </div>
           </div>
         </div>

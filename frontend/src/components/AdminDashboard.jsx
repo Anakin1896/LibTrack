@@ -77,6 +77,26 @@ function AdminDashboard({ user }) {
     navigate('/login');
   };
 
+  const handleResolveFromModal = async (transactionId) => {
+    if (!window.confirm("Has the student settled the penalty for this lost book?")) return;
+    
+    try {
+      await api.patch(`/transactions/${transactionId}/`, { status: 'RESOLVED' });
+      showNotification("Lost book penalty resolved.", "success");
+      
+      fetchTransactions(); 
+      fetchBooks();
+
+      setDashboardModal(prev => ({
+        ...prev,
+        data: prev.data.filter(item => item.id !== transactionId)
+      }));
+      
+    } catch (error) {
+      showNotification("Error resolving transaction.", "error");
+    }
+  };
+
   const totalBooksCount = books.reduce((sum, book) => sum + (book.active_copies_count ?? (book.copies?.length || 0)), 0);
   const activeCheckouts = transactions.filter(tx => tx.status === 'ACTIVE');
   const pendingRequests = transactions.filter(tx => tx.status === 'PENDING');
@@ -156,7 +176,7 @@ function AdminDashboard({ user }) {
                       <><th className="p-4 pl-6 font-semibold">Title</th><th className="p-4 font-semibold">Author</th><th className="p-4 font-semibold text-right pr-6">Copies</th></>
                     )}
                     {(dashboardModal.type === 'borrowed' || dashboardModal.type === 'attention') && (
-                      <><th className="p-4 pl-6 font-semibold">Borrower ID</th><th className="p-4 font-semibold">Book Title</th><th className="p-4 font-semibold">Due Date</th><th className="p-4 font-semibold text-right pr-6">Status</th></>
+                      <><th className="p-4 pl-6 font-semibold">Borrower ID</th><th className="p-4 font-semibold">Book Title</th><th className="p-4 font-semibold">Due Date</th><th className="p-4 font-semibold text-right pr-6">Status / Action</th></>
                     )}
                     {dashboardModal.type === 'members' && (
                       <><th className="p-4 pl-6 font-semibold">ID Number</th><th className="p-4 font-semibold">Name</th><th className="p-4 font-semibold text-right pr-6">Role</th></>
@@ -178,9 +198,21 @@ function AdminDashboard({ user }) {
                         {(dashboardModal.type === 'borrowed' || dashboardModal.type === 'attention') && (
                           <><td className="p-4 pl-6 font-bold text-slate-900">{item.user?.username || item.member_id}</td><td className="p-4 text-slate-600">{item.book_title}</td><td className="p-4">{new Date(item.due_date).toLocaleDateString()}</td>
                           <td className="p-4 text-right pr-6">
-                            <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full border ${item.status === 'LOST' ? 'bg-slate-800 text-white border-slate-900' : isOverdue ? 'bg-red-100 text-red-800 border-red-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
-                              {item.status === 'LOST' ? 'Lost' : isOverdue ? 'Overdue' : 'Active'}
-                            </span>
+                            <div className="flex items-center justify-end gap-2">
+                              <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full border ${item.status === 'LOST' ? 'bg-slate-800 text-white border-slate-900' : isOverdue ? 'bg-red-100 text-red-800 border-red-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>
+                                {item.status === 'LOST' ? 'Lost' : isOverdue ? 'Overdue' : 'Active'}
+                              </span>
+                              
+                              {/* NEW: Display the Resolve button directly in the modal if the status is LOST */}
+                              {item.status === 'LOST' && dashboardModal.type === 'attention' && (
+                                <button 
+                                  onClick={() => handleResolveFromModal(item.id)}
+                                  className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-lg text-[10px] font-bold transition-colors border border-blue-200 ml-2"
+                                >
+                                  Resolve
+                                </button>
+                              )}
+                            </div>
                           </td></>
                         )}
                         {dashboardModal.type === 'members' && (
@@ -391,38 +423,6 @@ function AdminDashboard({ user }) {
                         </table>
                       </div>
                     </div>
-
-                    <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
-                      <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-serif font-bold text-lg text-slate-900">Due Soon / Overdue</h3>
-                        <button onClick={() => setActiveTab('transactions')} className="text-xs font-bold text-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 transition-colors">Manage</button>
-                      </div>
-                      <div className="space-y-2">
-                        {attentionList.length === 0 ? (
-                           <p className="text-sm text-slate-500 p-4 text-center">No books are due soon or overdue.</p>
-                        ) : (
-                           attentionList.map(tx => {
-                             const borrowerName = tx.user?.first_name ? `${tx.user.first_name} ${tx.user.last_name}` : (tx.user?.username || tx.member_id || 'Unknown');
-                             const initials = borrowerName.substring(0, 2).toUpperCase();
-                             const dueInfo = getDueStatus(tx.due_date);
-  
-                             return (
-                               <div key={tx.id} className="flex items-center justify-between p-3 hover:bg-stone-50 rounded-xl transition-colors border border-transparent hover:border-stone-100">
-                                 <div className="flex items-center gap-4">
-                                   <div className="w-10 h-10 rounded-full bg-[#14291c] text-white flex items-center justify-center font-bold text-sm shrink-0">{initials}</div>
-                                   <div>
-                                     <p className="text-sm font-bold text-slate-800">{borrowerName}</p>
-                                     <p className="text-[11px] text-slate-500">{tx.book_title}</p>
-                                   </div>
-                                 </div>
-                                 <span className={`text-[10px] font-bold px-3 py-1 rounded-full ${dueInfo.style}`}>{dueInfo.text}</span>
-                               </div>
-                             )
-                           })
-                        )}
-                      </div>
-                    </div>
-
                  </div>
 
                  <div className="space-y-8">
@@ -440,9 +440,11 @@ function AdminDashboard({ user }) {
                                let actionText = '';
                                let icon = '';
                                let iconColor = '';
+                               
                                if (tx.status === 'RETURNED') { actionText = 'returned'; icon = '📥'; iconColor = 'bg-blue-50 text-blue-500'; }
                                else if (tx.status === 'ACTIVE') { actionText = 'borrowed'; icon = '📤'; iconColor = 'bg-emerald-50 text-emerald-500'; }
                                else if (tx.status === 'LOST') { actionText = 'reported lost'; icon = '⚠️'; iconColor = 'bg-red-50 text-red-500'; }
+                               else if (tx.status === 'RESOLVED') { actionText = 'settled penalty for'; icon = '✅'; iconColor = 'bg-emerald-50 text-emerald-500'; }
                                else if (tx.status === 'PENDING') { actionText = 'requested'; icon = '⏳'; iconColor = 'bg-purple-50 text-purple-500'; }
                                else { actionText = 'updated'; icon = '📝'; iconColor = 'bg-stone-50 text-stone-500'; }
 
@@ -459,29 +461,6 @@ function AdminDashboard({ user }) {
                          )}
                       </div>
                     </div>
-
-                    <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
-                      <h3 className="font-serif font-bold text-lg text-slate-900 mb-4">Quick Actions</h3>
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                         <button onClick={() => setActiveTab('inventory')} className="py-4 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors">
-                           <span className="text-xl text-indigo-500">➕</span>
-                           <span className="text-[10px] font-bold text-slate-700 uppercase">Add Book</span>
-                         </button>
-                         <button onClick={() => setActiveTab('transactions')} className="py-4 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors">
-                           <span className="text-xl text-blue-500">🔄</span>
-                           <span className="text-[10px] font-bold text-slate-700 uppercase">Issue Book</span>
-                         </button>
-                         <button onClick={() => setActiveTab('transactions')} className="py-4 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors">
-                           <span className="text-xl text-emerald-500">📥</span>
-                           <span className="text-[10px] font-bold text-slate-700 uppercase">Return Book</span>
-                         </button>
-                         <button onClick={() => setActiveTab('members')} className="py-4 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors">
-                           <span className="text-xl text-purple-500">👤</span>
-                           <span className="text-[10px] font-bold text-slate-700 uppercase">Members Tab</span>
-                         </button>
-                      </div>
-                    </div>
-
                  </div>
                </div>
             </div>
@@ -491,4 +470,5 @@ function AdminDashboard({ user }) {
     </div>
   );
 }
+
 export default AdminDashboard;

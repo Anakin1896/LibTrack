@@ -16,6 +16,7 @@ class Transaction(models.Model):
         ('OVERDUE', 'Overdue'),
         ('LOST', 'Lost'),
         ('CANCELLED', 'Cancelled'),
+        ('RESOLVED', 'Resolved'),
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='transactions')

@@ -17,9 +17,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated] 
 
     def get_queryset(self):
-
         today = timezone.now().date()
-
         expired_transactions = Transaction.objects.filter(status='PENDING', expected_pickup_date__lt=today)
         
         for tx in expired_transactions:
@@ -41,7 +39,6 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return Transaction.objects.filter(user=user).order_by('-reservation_date')
 
     def create(self, request, *args, **kwargs):
-
         if request.user.role in ['ADMIN', 'LIBRARIAN'] and 'member_id' in request.data:
             member_id = request.data.get('member_id')
             isbn = request.data.get('isbn')
@@ -116,7 +113,6 @@ class TransactionViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
     def perform_update(self, serializer):
-        
         old_instance = self.get_object()
         old_status = old_instance.status
 
@@ -129,7 +125,6 @@ class TransactionViewSet(viewsets.ModelViewSet):
         elif instance.status == 'LOST':
             copy.status = 'LOST'
             copy.save()
-
         if old_status == 'PENDING' and instance.status == 'CANCELLED':
             Notification.objects.create(
                 user=instance.user,
@@ -139,6 +134,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
             Notification.objects.create(
                 user=instance.user,
                 message=f"Library Notice: Good news! Your reservation for '{copy.book.title}' has been approved and issued to you."
+            )
+        elif old_status == 'LOST' and instance.status == 'RESOLVED':
+            Notification.objects.create(
+                user=instance.user,
+                message=f"Library Notice: The penalty for your lost book '{copy.book.title}' has been successfully resolved. Thank you!"
             )
 
     @action(detail=True, methods=['post'])
