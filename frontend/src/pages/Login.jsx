@@ -183,8 +183,8 @@ function Login() {
           </div>
         </div>
         <div className="mt-auto pt-10">
-            <p className="text-emerald-100/30 text-xs tracking-widest uppercase font-bold">
-                © <span className="text-[#e6a83a]/60">LibTrack System</span>
+            <p className="text-emerald-100/30 text-xs tracking-widest font-bold">
+                © <span className="text-[#e6a83a]/60">BugSplat</span>
             </p>
         </div>
       </div>
