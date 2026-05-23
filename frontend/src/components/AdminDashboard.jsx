@@ -203,7 +203,6 @@ function AdminDashboard({ user }) {
                                 {item.status === 'LOST' ? 'Lost' : isOverdue ? 'Overdue' : 'Active'}
                               </span>
                               
-                              {/* NEW: Display the Resolve button directly in the modal if the status is LOST */}
                               {item.status === 'LOST' && dashboardModal.type === 'attention' && (
                                 <button 
                                   onClick={() => handleResolveFromModal(item.id)}
@@ -461,6 +460,29 @@ function AdminDashboard({ user }) {
                          )}
                       </div>
                     </div>
+
+                    <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
+                      <h3 className="font-serif font-bold text-lg text-slate-900 mb-4">Quick Actions</h3>
+                      <div className="grid grid-cols-2 gap-3">
+                         <button onClick={() => setActiveTab('inventory')} className="py-4 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors">
+                           <span className="text-xl text-indigo-500">➕</span>
+                           <span className="text-[10px] font-bold text-slate-700 uppercase">Add Book</span>
+                         </button>
+                         <button onClick={() => setActiveTab('transactions')} className="py-4 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors">
+                           <span className="text-xl text-blue-500">🔄</span>
+                           <span className="text-[10px] font-bold text-slate-700 uppercase">Issue Book</span>
+                         </button>
+                         <button onClick={() => setActiveTab('transactions')} className="py-4 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors">
+                           <span className="text-xl text-emerald-500">📥</span>
+                           <span className="text-[10px] font-bold text-slate-700 uppercase">Return Book</span>
+                         </button>
+                         <button onClick={() => setActiveTab('members')} className="py-4 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors">
+                           <span className="text-xl text-purple-500">👤</span>
+                           <span className="text-[10px] font-bold text-slate-700 uppercase">Members</span>
+                         </button>
+                      </div>
+                    </div>
+
                  </div>
                </div>
             </div>
