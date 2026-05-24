@@ -237,8 +237,8 @@ function AdminDashboard({ user }) {
           <p className="text-[11px] text-emerald-400 mb-2">{user?.role === 'ADMIN' ? 'Library Administrator' : 'Librarian'}</p>
           <span className="px-3 py-1 bg-yellow-600/20 text-[#e6a83a] text-[9px] uppercase tracking-widest font-bold rounded-full border border-yellow-600/30">✦ {user?.role || 'Admin'}</span>
         </div>
-        
-        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto mt-2">
+
+        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto mt-2 scrollbar-hide">
           <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest ml-4 mb-3">Main</p>
           <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm font-medium ${activeTab === 'dashboard' ? 'bg-[#e6a83a] text-[#14291c] font-bold shadow-md' : 'text-emerald-100/70 hover:bg-emerald-800/40 hover:text-white'}`}><span>⊞</span> Dashboard</button>
           <button onClick={() => setActiveTab('profile')} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm font-medium ${activeTab === 'profile' ? 'bg-[#e6a83a] text-[#14291c] font-bold shadow-md' : 'text-emerald-100/70 hover:bg-emerald-800/40 hover:text-white'}`}><span>👤</span> Profile</button>

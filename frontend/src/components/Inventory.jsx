@@ -111,35 +111,43 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
 
   const handlePrintQRSticker = (e) => {
     e.preventDefault();
-    const canvas = document.getElementById('qr-canvas');
-    if (!canvas) return;
-    const pngUrl = canvas.toDataURL("image/png");
-
+    if (!qrBook.copies || qrBook.copies.length === 0) return showNotification("No copies to print.", "error");
+    
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
+
+    let stickersHtml = '';
+    qrBook.copies.forEach((copy, idx) => {
+      const canvas = document.getElementById(`qr-copy-${copy.tracking_uuid}`);
+      if(canvas) {
+         const pngUrl = canvas.toDataURL("image/png");
+         stickersHtml += `
+           <div class="sticker" style="page-break-inside: avoid; margin-bottom: 20px;">
+             <div class="school-name">JPNHS Library</div>
+             <img src="${pngUrl}" alt="QR Code" />
+             <h3>${qrBook.title}</h3>
+             <p>Copy #${idx + 1} | ID: ${copy.tracking_uuid.substring(0,8)}</p>
+           </div>
+         `;
+      }
+    });
+
     iframe.contentDocument.write(`
       <html>
         <head>
           <title>Print QR - ${qrBook.title}</title>
           <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; padding: 20px; }
-            .sticker { border: 2px dashed #ccc; padding: 20px; text-align: center; width: 250px; border-radius: 8px; }
-            .school-name { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #14291c; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-            h3 { font-size: 14px; margin: 10px 0 5px; color: #14291c; font-weight: 800; line-height: 1.2; }
-            p { font-size: 11px; color: #555; margin: 0; }
-            img { max-width: 150px; height: auto; margin-bottom: 5px; }
-            @media print { body { padding: 0; } .sticker { border: none; padding: 0; } }
+            body { font-family: sans-serif; display: flex; flex-wrap: wrap; gap: 20px; padding: 20px; }
+            .sticker { border: 2px dashed #ccc; padding: 20px; text-align: center; width: 200px; border-radius: 8px; }
+            .school-name { font-size: 10px; font-weight: bold; text-transform: uppercase; color: #14291c; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+            h3 { font-size: 14px; margin: 10px 0 5px; color: #14291c; line-height: 1.2; }
+            p { font-size: 11px; color: #555; margin: 0; font-family: monospace; }
+            img { max-width: 130px; height: auto; margin-bottom: 5px; }
+            @media print { body { padding: 0; } .sticker { border: none; } }
           </style>
         </head>
-        <body>
-          <div class="sticker">
-            <div class="school-name">JPNHS Library</div>
-            <img src="${pngUrl}" alt="QR Code" />
-            <h3>${qrBook.title}</h3>
-            <p>ISBN: ${qrBook.isbn}</p>
-          </div>
-        </body>
+        <body>${stickersHtml}</body>
       </html>
     `);
     iframe.contentDocument.close();
@@ -147,10 +155,7 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
     setTimeout(() => {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-        setQrBook(null);
-      }, 1000);
+      setTimeout(() => { document.body.removeChild(iframe); setQrBook(null); }, 1000);
     }, 250);
   };
 
@@ -330,29 +335,36 @@ function Inventory({ books, isLoadingBooks, fetchBooks, showNotification }) {
 
       {qrBook && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100 text-center flex flex-col">
-              <div className="bg-[#14291c] p-4 px-6 flex justify-between items-center">
-                <h3 className="font-serif font-bold text-lg text-white">Book QR Code</h3>
+           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[80vh]">
+              <div className="bg-[#14291c] p-4 px-6 flex justify-between items-center shrink-0">
+                <h3 className="font-serif font-bold text-lg text-white">{qrBook.title} - Asset QRs</h3>
                 <button onClick={() => setQrBook(null)} className="text-emerald-200 hover:text-white text-xl leading-none">&times;</button>
               </div>
               
-              <div className="p-8 flex flex-col items-center justify-center bg-stone-50 border-b border-stone-100">
-                 <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-200 mb-4 inline-block">
-                   <QRCodeCanvas 
-                      id="qr-canvas" 
-                      value={`ISBN: ${qrBook.isbn}\nTitle: ${qrBook.title}\nAuthor: ${qrBook.author}`} 
-                      size={180} 
-                      level={"M"} 
-                   />
+              <div className="p-6 overflow-y-auto flex-1 bg-stone-50">
+                 <p className="text-sm text-slate-500 mb-4 text-center">Print unique asset tags for each physical copy.</p>
+                 <div className="flex flex-wrap gap-4 justify-center">
+                   {qrBook.copies && qrBook.copies.length > 0 ? qrBook.copies.map((copy, idx) => (
+                     <div key={copy.tracking_uuid} className="bg-white p-4 rounded-xl shadow-sm border border-stone-200 flex flex-col items-center">
+                       <QRCodeCanvas 
+                          id={`qr-copy-${copy.tracking_uuid}`} 
+                          value={`COPY_ID: ${copy.tracking_uuid}\nTitle: ${qrBook.title}`} 
+                          size={120} 
+                          level={"M"} 
+                       />
+                       <p className="text-xs font-bold text-slate-700 mt-3">Copy #{idx + 1}</p>
+                       <p className="text-[9px] text-slate-400 font-mono mt-0.5">{copy.tracking_uuid.substring(0,8)}</p>
+                     </div>
+                   )) : (
+                     <p className="text-sm text-slate-500">No copies available to generate QRs.</p>
+                   )}
                  </div>
-                 <h4 className="font-bold text-slate-900 text-lg leading-tight">{qrBook.title}</h4>
-                 <p className="text-xs text-slate-500 mt-1 font-mono">{qrBook.isbn}</p>
               </div>
 
-              <div className="p-4 flex gap-3 bg-white">
+              <div className="p-4 flex gap-3 bg-white border-t border-stone-100 shrink-0">
                 <button onClick={() => setQrBook(null)} className="w-1/2 px-4 py-2.5 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors">Close</button>
-                <button onClick={handlePrintQRSticker} className="w-1/2 bg-purple-600 text-white px-4 py-2.5 rounded-lg font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2">
-                  <span>🖨️</span> Print Sticker
+                <button onClick={handlePrintQRSticker} className="w-1/2 bg-purple-600 text-white px-4 py-2.5 rounded-lg font-bold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2" disabled={!qrBook.copies || qrBook.copies.length === 0}>
+                  <span>🖨️</span> Print All Stickers
                 </button>
               </div>
            </div>

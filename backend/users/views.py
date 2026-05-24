@@ -28,6 +28,16 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
+    def perform_create(self, serializer):
+
+        raw_password = self.request.data.get('password')
+        user = serializer.save()
+        
+        if raw_password:
+            user.set_password(raw_password)
+            user.requires_password_change = True
+            user.save()
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 

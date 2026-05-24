@@ -41,15 +41,18 @@ class TransactionViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         if request.user.role in ['ADMIN', 'LIBRARIAN'] and 'member_id' in request.data:
             member_id = request.data.get('member_id')
-            isbn = request.data.get('isbn')
+            tracking_uuid = request.data.get('tracking_uuid')
             due_date = request.data.get('due_date')
+
+            if not tracking_uuid:
+                return Response({"detail": "Please select a specific physical copy to issue."}, status=status.HTTP_400_BAD_REQUEST)
 
             try:
                 student = User.objects.get(username=member_id)
-                book_copy = BookCopy.objects.filter(book__isbn=isbn, status='AVAILABLE').first()
+                book_copy = BookCopy.objects.filter(tracking_uuid=tracking_uuid, status='AVAILABLE').first()
                 
                 if not book_copy:
-                    return Response({"detail": "No available copies found for that ISBN."}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"detail": "This specific physical copy is not available or does not exist."}, status=status.HTTP_400_BAD_REQUEST)
 
                 transaction = Transaction.objects.create(
                     user=student,
@@ -68,11 +71,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 return Response({"detail": "Student/Teacher ID not found in database."}, status=status.HTTP_400_BAD_REQUEST)
 
         else:
-            isbn = request.data.get('isbn')
+            tracking_uuid = request.data.get('tracking_uuid')
             pickup_date_str = request.data.get('expected_pickup_date')
-            
-            if not isbn:
-                return Response({"detail": "ISBN is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not tracking_uuid:
+                return Response({"detail": "Please select a specific physical copy to reserve."}, status=status.HTTP_400_BAD_REQUEST)
             if not pickup_date_str:
                 return Response({"detail": "Please select a valid pickup date."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -87,10 +90,10 @@ class TransactionViewSet(viewsets.ModelViewSet):
             if pickup_date > today + timedelta(days=3):
                  return Response({"detail": "Reservation limit exceeded. You must pick up the book within 3 days."}, status=status.HTTP_400_BAD_REQUEST)
 
-            book_copy = BookCopy.objects.filter(book__isbn=isbn, status='AVAILABLE').first()
+            book_copy = BookCopy.objects.filter(tracking_uuid=tracking_uuid, status='AVAILABLE').first()
             
             if not book_copy:
-                return Response({"detail": "Sorry, no copies are currently available."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"detail": "Sorry, this specific copy is no longer available."}, status=status.HTTP_400_BAD_REQUEST)
 
             pickup_datetime = timezone.make_aware(datetime.combine(pickup_date, datetime.min.time()))
             default_due_date = pickup_datetime + timedelta(days=7)
@@ -176,3 +179,24 @@ class TransactionViewSet(viewsets.ModelViewSet):
             transaction.book_copy.save()
 
         return Response({"status": "Reservation cancelled successfully."}, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['post'])
+    def return_by_scan(self, request):
+        tracking_uuid = request.data.get('tracking_uuid')
+        
+        if not tracking_uuid:
+            return Response({"detail": "Please scan a valid QR code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        transaction = Transaction.objects.filter(book_copy__tracking_uuid=tracking_uuid, status='ACTIVE').first()
+
+        if not transaction:
+            return Response({"detail": "This specific copy is not currently marked as borrowed."}, status=status.HTTP_400_BAD_REQUEST)
+
+        transaction.status = 'RETURNED'
+        transaction.return_date = timezone.now()
+        transaction.save()
+
+        transaction.book_copy.status = 'AVAILABLE'
+        transaction.book_copy.save()
+
+        return Response({"status": "Book returned successfully!"}, status=status.HTTP_200_OK)
