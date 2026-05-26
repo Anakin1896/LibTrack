@@ -461,7 +461,7 @@ function AdminDashboard({ user }) {
                       </div>
                     </div>
 
-                    <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
+                   {/* <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
                       <h3 className="font-serif font-bold text-lg text-slate-900 mb-4">Quick Actions</h3>
                       <div className="grid grid-cols-2 gap-3">
                          <button onClick={() => setActiveTab('inventory')} className="py-4 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors">
@@ -481,7 +481,7 @@ function AdminDashboard({ user }) {
                            <span className="text-[10px] font-bold text-slate-700 uppercase">Members</span>
                          </button>
                       </div>
-                    </div>
+                    </div> */}
 
                  </div>
                </div>
