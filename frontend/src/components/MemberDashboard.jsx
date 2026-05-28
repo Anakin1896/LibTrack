@@ -5,13 +5,11 @@ import api from '../api';
 function MemberDashboard({ user }) {
   const [activeTab, setActiveTab] = useState('catalog');
   const [searchQuery, setSearchQuery] = useState('');
-  
   const [books, setBooks] = useState([]);
   const [myTransactions, setMyTransactions] = useState([]);
   
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  
   const [selectedBook, setSelectedBook] = useState(null);
   const [reservationStatus, setReservationStatus] = useState(null); 
   const [isLoading, setIsLoading] = useState(true);
@@ -20,12 +18,14 @@ function MemberDashboard({ user }) {
   const [reservationToCancel, setReservationToCancel] = useState(null);
 
   const notifRef = useRef(null);
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
+  
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-
+  
   const getFormattedDate = (dateObj) => {
     return dateObj.toISOString().split('T')[0];
   };
+  
   const minDateStr = getFormattedDate(new Date());
   const maxDateObj = new Date();
   maxDateObj.setDate(maxDateObj.getDate() + 3);
@@ -109,10 +109,9 @@ function MemberDashboard({ user }) {
 
   const confirmCancelReservation = async () => {
     if (!reservationToCancel) return;
-    
     try {
       await api.post(`/transactions/${reservationToCancel.id}/cancel_reservation/`);
-      fetchMemberData(); 
+      fetchMemberData();
     } catch (error) {
       alert(error.response?.data?.detail || "Error cancelling reservation.");
     } finally {
@@ -127,17 +126,25 @@ function MemberDashboard({ user }) {
       return;
     }
 
+    const availableCopy = selectedBook.copies?.find(c => c.status === 'AVAILABLE');
+
+    if (!availableCopy) {
+      setReservationStatus({ 
+        type: 'error', 
+        message: "Sorry, no physical copies of this book are currently available for reservation." 
+      });
+      return;
+    }
+
     try {
       await api.post('/transactions/', { 
-        isbn: selectedBook.isbn,
+        tracking_uuid: availableCopy.tracking_uuid,
         expected_pickup_date: pickupDate 
       });
-      
       const reservedTitle = selectedBook.title;
       setSelectedBook(null);
       fetchMemberData();
       setReservationStatus({ type: 'success', title: reservedTitle });
-      
     } catch (error) {
       setReservationStatus({ 
         type: 'error', 
@@ -358,7 +365,7 @@ function MemberDashboard({ user }) {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col md:flex-row">
             <div className="bg-[#1a3626] md:w-2/5 p-8 flex flex-col items-center justify-center text-center relative border-r border-[#102418]">
-               <div className="w-32 h-44 bg-[#0d1f14] rounded shadow-2xl border-l-4 border-yellow-600 flex items-center justify-center text-center p-4 mb-6">
+              <div className="w-32 h-44 bg-[#0d1f14] rounded shadow-2xl border-l-4 border-yellow-600 flex items-center justify-center text-center p-4 mb-6">
                  <span className="text-white font-serif text-sm font-bold leading-tight">{selectedBook.title}</span>
                </div>
                <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border ${selectedBook.active_copies_count > 0 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'}`}>
@@ -420,27 +427,15 @@ function MemberDashboard({ user }) {
       {reservationToCancel && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-8 text-center">
-            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">
-              ⚠️
-            </div>
+            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">⚠️</div>
             <h3 className="font-serif font-bold text-xl text-slate-900 mb-2">Cancel Reservation?</h3>
             <p className="text-slate-500 text-sm mb-8 leading-relaxed">
               Are you sure you want to cancel your reservation for <br/>
               <strong className="text-slate-800">"{reservationToCancel.book_title}"</strong>?
             </p>
             <div className="flex justify-center gap-3">
-              <button 
-                onClick={() => setReservationToCancel(null)} 
-                className="px-6 py-3 rounded-xl font-bold text-slate-600 w-1/2 hover:bg-slate-100 transition-colors border border-stone-200"
-              >
-                Keep It
-              </button>
-              <button 
-                onClick={confirmCancelReservation} 
-                className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold w-1/2 hover:bg-red-700 transition-colors shadow-md"
-              >
-                Yes, Cancel
-              </button>
+              <button onClick={() => setReservationToCancel(null)} className="px-6 py-3 rounded-xl font-bold text-slate-600 w-1/2 hover:bg-slate-100 transition-colors border border-stone-200">Keep It</button>
+              <button onClick={confirmCancelReservation} className="bg-red-600 text-white px-6 py-3 rounded-xl font-bold w-1/2 hover:bg-red-700 transition-colors shadow-md">Yes, Cancel</button>
             </div>
           </div>
         </div>
@@ -449,12 +444,9 @@ function MemberDashboard({ user }) {
       {reservationStatus && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100 p-8 text-center flex flex-col items-center">
-            
             {reservationStatus.type === 'success' ? (
               <>
-                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mb-4 shadow-inner">
-                  🎉
-                </div>
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mb-4 shadow-inner">🎉</div>
                 <h3 className="font-serif font-bold text-2xl text-slate-900 mb-2">Reservation Successful!</h3>
                 <p className="text-slate-500 text-sm mb-8 leading-relaxed">
                   <strong>"{reservationStatus.title}"</strong> is now pending. Please visit the library desk to pick it up on your selected date.
@@ -471,17 +463,10 @@ function MemberDashboard({ user }) {
               </>
             ) : (
               <>
-                <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl mb-4 shadow-inner">
-                  ⚠️
-                </div>
+                <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl mb-4 shadow-inner">⚠️</div>
                 <h3 className="font-serif font-bold text-2xl text-slate-900 mb-2">Reservation Failed</h3>
-                <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                  {reservationStatus.message}
-                </p>
-                <button
-                  onClick={() => setReservationStatus(null)}
-                  className="w-full bg-stone-100 text-slate-700 px-6 py-3 rounded-xl font-bold hover:bg-stone-200 transition-colors"
-                >
+                <p className="text-slate-500 text-sm mb-8 leading-relaxed">{reservationStatus.message}</p>
+                <button onClick={() => setReservationStatus(null)} className="w-full bg-stone-100 text-slate-700 px-6 py-3 rounded-xl font-bold hover:bg-stone-200 transition-colors">
                   Close
                 </button>
               </>
